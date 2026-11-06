@@ -7,7 +7,7 @@ export default defineConfig({
   testMatch: 'browser.spec.js',
   workers: 1,
   timeout: 30000,
-  use: { baseURL: url, trace: 'retain-on-failure' },
+  use: { baseURL: url, trace: 'retain-on-failure', channel: process.env.PLAYWRIGHT_CHANNEL },
   webServer: {
     command: 'node server/demo.js --seed',
     env: { PORT: '4174' },
