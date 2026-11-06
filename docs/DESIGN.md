@@ -1,0 +1,13 @@
+# Crewboard design
+
+Crewboard uses a React client, an Express API, and a MongoDB replica set. One instance of the app serves one event. Profiles contain public names, skills, and time zones. Email and session records stay private. The board lists open teams in stable key order with cursor pagination and indexed skill filters.
+
+**Seat integrity.** Each seat claim checks capacity, updates the team by version, inserts the membership, closes any pending request, and writes the audit event in one transaction. Competing claims write the same team document, so a conflict retries with a fresh snapshot. A unique index on event and participant prevents enrollment by different teams. Tests race 50 leader approvals and 50 separate invite holders across two app instances. Each race produces one new membership and one audit entry.
+
+**Team lifecycle.** A new team starts with one member and remains in the forming state until it reaches the configured minimum. A leave or removal can return it to forming. Capacity is a hard upper bound. On leader departure, the longest-serving remaining member takes over and old invitations are revoked. The last departure deletes the team, outstanding requests, and invites while retaining audit history.
+
+**Retries and invitations.** A mutation key binds a successful result to an actor, route, and payload for 24 hours. It is recorded in the same transaction. Leaders approve ordinary requests. An invite is a separate, single-use preapproval for one seat. Codes expire after one hour and the server checks expiry at redemption. A keyed derivation allows exact replay while only the code hash is stored. Taking a seat or starting a team cancels the participant's other applications. Participants can also withdraw requests.
+
+**Live state and matching.** A database change stream publishes coalesced invalidations after commit. Membership changes refresh open boards. Private changes notify the relevant people with an empty event payload. Clients fetch authorized state and reconnect after interruptions. Teammate ranking awards four points per skill the team does not cover and up to four points for nearby local time. The app explains the factors beside each suggestion.
+
+**Trade-offs.** Realtime traffic stays behind authentication, with a per-user stream cap and bounded fanout per instance. Suggestions use a five-second shared candidate snapshot. A free-tier deployment can sleep or impose long-connection limits. With one more week, I would paginate incoming requests, benchmark live viewers during write bursts on the deployment host, and add account verification and recovery before onboarding a public event.

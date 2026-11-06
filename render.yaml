@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: crewboard-ps1
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.13.0
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: '1'
+      - key: MONGO_DATABASE
+        value: crewboard
+      - key: MONGO_URL
+        sync: false
+      - key: INVITE_SECRET
+        sync: false
