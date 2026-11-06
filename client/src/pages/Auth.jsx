@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as api from '../api.js';
 import { LIMITS, browserTimezone } from '../format.js';
 import { useAction } from '../hooks.js';
@@ -164,28 +164,42 @@ function SignupForm({ onSignedIn, refreshSession, onSwitch }) {
 export function AuthPage({ notice, onSignedIn, refreshSession }) {
   const invited = /^#\/join\?/.test(window.location.hash) &&
     Boolean(new URLSearchParams(window.location.hash.split('?')[1]).get('code'));
+  const [opened, setOpened] = useState(false);
   const [mode, setMode] = useState(invited ? 'signup' : 'login');
+  const formRef = useRef(null);
+  const expanded = opened || invited || Boolean(notice);
   const title = mode === 'login' ? 'Log in' : 'Create your account';
   const Form = mode === 'login' ? LoginForm : SignupForm;
+
+  useEffect(() => {
+    if (opened) formRef.current?.querySelector('h1')?.focus();
+  }, [opened]);
+
   return (
-    <main className="auth">
+    <main className={expanded ? 'auth' : 'auth auth-intro'}>
       <section className="auth-story" aria-label="About Seatsplice">
         <p className="brand"><span className="brand-mark" aria-hidden="true" />Seatsplice</p>
-        <SignalArt />
-        <div className="signal-copy">
+        {!expanded && <>
+          <h1 className="visually-hidden">Seatsplice</h1>
+          <button type="button" className="signal-skip" onClick={() => setOpened(true)}>
+            Skip to sign-in
+          </button>
+        </>}
+        <SignalArt onOpenSignIn={expanded ? undefined : () => setOpened(true)} />
+        {expanded && <div className="signal-copy">
           <p className="eyebrow">The hackathon team finder</p>
           <p className="auth-line">Find your people.</p>
           <p className="muted">Find an open seat, start a team, or join with an invite code.</p>
-        </div>
-        <p className="signal-footer">Bring your own rubber duck.</p>
+        </div>}
+        {expanded && <p className="signal-footer">Bring your own rubber duck.</p>}
       </section>
-      <section className="auth-form">
+      {expanded && <section ref={formRef} className={opened ? 'auth-form auth-reveal' : 'auth-form'}>
         <Page key={mode} title={title} eyebrow={invited ? 'You have a team invite' : undefined}
           intro={invited ? 'Sign in or create an account, then confirm your invite.' : mode === 'login' ? 'Sign in to your team board.' : 'Tell teams what you can help build.'}>
           {notice && <p className="alert" role="status">{notice}</p>}
           <Form onSignedIn={onSignedIn} refreshSession={refreshSession} onSwitch={() => setMode(mode === 'login' ? 'signup' : 'login')} />
         </Page>
-      </section>
+      </section>}
     </main>
   );
 }

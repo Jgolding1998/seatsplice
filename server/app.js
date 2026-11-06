@@ -151,6 +151,10 @@ export function createApp(db, {
   api.use((_req, _res) => input.fail(404, 'NOT_FOUND', 'This endpoint does not exist.'));
   app.use('/api', api);
   if (staticDir) {
+    // Vite fingerprints files in assets. Keep HTML and public files revalidating.
+    app.use('/assets', express.static(path.join(staticDir, 'assets'), {
+      dotfiles: 'deny', index: false, fallthrough: false, immutable: true, maxAge: '1y'
+    }));
     app.use(express.static(staticDir, { dotfiles: 'deny', index: false }));
     app.get('/{*path}', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(staticDir, 'index.html')));
   }

@@ -5,7 +5,10 @@ import { expect, test } from '@playwright/test';
 async function signup(page, name, skill = 'React', inviteUrl) {
   await page.goto(inviteUrl ?? '/');
   if (inviteUrl) await expect(page.getByText('You have a team invite')).toBeVisible();
-  else await page.getByRole('button', { name: 'Create an account' }).click();
+  else {
+    await page.getByRole('button', { name: 'Skip to sign-in' }).click();
+    await page.getByRole('button', { name: 'Create an account' }).click();
+  }
   await page.getByLabel('Name', { exact: true }).fill(name);
   await page.getByLabel('Email', { exact: true }).fill(`${randomUUID()}@example.test`);
   await page.getByLabel('Password', { exact: true }).fill('fixture password for browser tests');
@@ -28,6 +31,142 @@ async function makeTeam(page, name) {
   await page.getByRole('button', { name: 'Create team', exact: true }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 }
+
+function sphereImage(control) {
+  return control.locator('canvas').evaluate(canvas => {
+    const preview = document.createElement('canvas');
+    preview.width = preview.height = 32;
+    const ctx = preview.getContext('2d');
+    ctx.drawImage(canvas, 0, 0, preview.width, preview.height);
+    const alpha = Array.from(ctx.getImageData(0, 0, preview.width, preview.height).data)
+      .filter((_, i) => i % 4 === 3);
+    return alpha.some(Boolean) ? alpha : null;
+  });
+}
+
+async function sphereDifference(control, reference) {
+  const current = await sphereImage(control);
+  if (!current) return NaN;
+  return current.reduce((sum, pixel, i) => sum + Math.abs(pixel - reference[i]), 0) / current.length;
+}
+
+test('sign-in sphere follows mouse drag and supports keyboard rotation and reset', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const sphere = page.getByRole('button', { name: 'Rotate particle sphere' });
+  const goldDot = page.getByRole('button', { name: 'Open sign-in' });
+  const login = page.getByRole('heading', { name: 'Log in' });
+  await expect(login).toBeHidden();
+  await expect(goldDot).toBeHidden();
+  await expect.poll(() => sphereImage(sphere)).not.toBeNull();
+  const original = await sphereImage(sphere);
+  const { x, y, width, height } = await sphere.boundingBox();
+  expect(width).toBeGreaterThanOrEqual(page.viewportSize().width - 1);
+  expect(height).toBeGreaterThanOrEqual(page.viewportSize().height - 1);
+  await page.mouse.move(x + width * .52, y + height * .42);
+  await page.mouse.down();
+  await page.mouse.move(x + width * .67, y + height * .55, { steps: 5 });
+  await expect.poll(() => sphereDifference(sphere, original)).toBeGreaterThan(.5);
+  const dragged = await sphereImage(sphere);
+  await page.mouse.up();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await sphereDifference(sphere, dragged)).toBeLessThan(.25);
+  await sphere.press('ArrowUp');
+  await expect.poll(() => sphereDifference(sphere, dragged)).toBeGreaterThan(.5);
+  await sphere.press('Home');
+  await expect.poll(() => sphereDifference(sphere, original)).toBeLessThan(.25);
+  await sphere.press('Enter');
+  await expect.poll(() => sphereDifference(sphere, original)).toBeGreaterThan(.5);
+  await sphere.press('Home');
+  await sphere.press('ArrowLeft');
+  await sphere.press('ArrowLeft');
+  await expect(goldDot).toBeVisible();
+  const dotPosition = await goldDot.boundingBox();
+  await sphere.press('ArrowLeft');
+  await expect.poll(async () => (await goldDot.boundingBox())?.x).not.toBe(dotPosition.x);
+  const { y: dotHeight } = await goldDot.boundingBox();
+  await sphere.press('ArrowDown');
+  await expect.poll(async () => (await goldDot.boundingBox())?.y).toBeGreaterThan(dotHeight);
+  await goldDot.press('Enter');
+  await expect(login).toBeFocused();
+  expect(await page.locator('.signal-stage').evaluate(stage =>
+    [...stage.childNodes].some(node => node.nodeType === Node.COMMENT_NODE && node.textContent.includes('stowaway duck'))
+  )).toBe(true);
+});
+
+test('sign-in sphere supports touch swipe and tap on a phone', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({
+    baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce'
+  });
+  try {
+    const page = await context.newPage();
+    await page.goto('/');
+    const sphere = page.getByRole('button', { name: 'Rotate particle sphere' });
+    await expect.poll(() => sphereImage(sphere)).not.toBeNull();
+    const original = await sphereImage(sphere);
+    const { x, y, width, height } = await sphere.boundingBox();
+    const start = { x: Math.round(x + width * .67), y: Math.round(y + height * .36) };
+    const touch = await context.newCDPSession(page);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchMove', touchPoints: [{ x: start.x + 23, y: start.y + 47 }]
+    });
+    await expect.poll(() => sphereDifference(sphere, original)).toBeGreaterThan(.5);
+    const swiped = await sphereImage(sphere);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.touchscreen.tap(start.x, start.y);
+    await expect.poll(() => sphereDifference(sphere, swiped)).toBeGreaterThan(.5);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchMove', touchPoints: [{ x: start.x - 185, y: start.y }]
+    });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.getByRole('button', { name: 'Open sign-in' }).tap();
+    await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test('sign-in sphere coasts briefly after a flick and then comes to rest', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.addInitScript(() => {
+    window.spherePaintsAfterRelease = 0;
+    let released = false;
+    document.addEventListener('pointerup', () => { released = true; }, { once: true });
+    const clearRect = CanvasRenderingContext2D.prototype.clearRect;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (released && this.canvas.matches('.signal-art')) window.spherePaintsAfterRelease++;
+      return clearRect.apply(this, args);
+    };
+  });
+  await page.goto('/');
+  const sphere = page.getByRole('button', { name: 'Rotate particle sphere' });
+  await expect.poll(() => sphereImage(sphere)).not.toBeNull();
+  const { x, y, width, height } = await sphere.boundingBox();
+  await page.mouse.move(x + width * .5, y + height * .4);
+  await page.mouse.down();
+  await page.mouse.move(x + width * .59, y + height * .4, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.spherePaintsAfterRelease)).toBeGreaterThan(2);
+  // Give the documented 320 ms coast time to finish before sampling for stability.
+  await page.waitForTimeout(400);
+  const settled = await sphereImage(sphere);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await sphereDifference(sphere, settled)).toBeLessThan(.25);
+});
+
+test('versioned assets are cacheable and missing bundles return 404 instead of the app shell', async ({ request }) => {
+  const shell = await request.get('/');
+  expect(shell.headers()['cache-control']).toBe('no-cache');
+  const bundle = (await shell.text()).match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
+  expect(bundle).toBeTruthy();
+  const asset = await request.get(bundle);
+  expect(asset.ok()).toBe(true);
+  expect(asset.headers()['cache-control']).toBe('public, max-age=31536000, immutable');
+  const missing = await request.get('/assets/missing-bundle.js');
+  expect(missing.status()).toBe(404);
+});
 
 test('two signed-in browsers request and approve the final seat without refreshing', async ({ page, browser, baseURL }) => {
   const failures = [];
@@ -127,11 +266,15 @@ test('compact navigation preserves desktop keyboard access and frees space on ph
 
 test('automated accessibility checks pass on sign-in, board and team screens', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
+  const open = page.getByRole('button', { name: 'Skip to sign-in' });
+  await expect(open).toBeVisible();
   const scan = async () => {
     const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
     expect(result.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => node.target) }))).toEqual([]);
   };
+  await scan();
+  await open.click();
+  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   await scan();
   await signup(page, 'Contrast Inspector');
   await page.getByRole('link', { name: 'Board', exact: true }).click();
@@ -147,6 +290,7 @@ test('automated accessibility checks pass on sign-in, board and team screens', a
 test('dark system sign-in keeps failed login feedback accessible', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/');
+  await page.getByRole('button', { name: 'Skip to sign-in' }).click();
   await page.getByLabel('Email', { exact: true }).fill('unknown@example.test');
   await page.getByLabel('Password', { exact: true }).fill('unused fixture password');
   await page.getByRole('button', { name: 'Log in' }).click();
