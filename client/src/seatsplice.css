@@ -1,36 +1,40 @@
-.auth { background: #f5f0e5; color-scheme: light; }
+.auth {
+  position: relative; isolation: isolate; overflow: clip; color-scheme: light;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: radial-gradient(ellipse at 32% 48%, #2a2032, transparent 68%), #13111a;
+}
 .auth.auth-intro { grid-template-columns: minmax(0, 1fr); }
 .auth-intro > .auth-story { min-height: 100dvh; border: 0; }
 .auth-intro .auth-story > h1.visually-hidden { position: absolute; }
-.auth-story {
+.auth > .auth-story {
+  grid-row: 1; grid-column: 1; z-index: 1; pointer-events: none;
   display: grid; grid-template-rows: auto 1fr auto; min-height: 270px;
   align-content: stretch; gap: 0; padding: 22px clamp(20px, 4.8vw, 72px);
-  background: #13111a; border-color: #342d43;
+  background: transparent; border-color: #342d43;
 }
+.auth > .auth-story::before { content: none; }
 .auth-story > .brand { width: max-content; color: #fff4df; }
-.auth-story > .signal-stage {
-  position: absolute; z-index: -1; right: -9%; top: 1%;
-  width: 78%; height: 99%;
+.auth > .signal-stage {
+  position: absolute; z-index: 0; grid-area: 1 / 1 / 2 / 2;
+  inset: 1% 0 0 31%;
+  container-type: size;
 }
 .signal-control {
   display: block; width: 100%; height: 100%; padding: 0; border: 0;
-  background: transparent; cursor: grab; touch-action: pan-y pinch-zoom;
+  background: transparent; cursor: grab; touch-action: none;
 }
 .signal-control:active { cursor: grabbing; }
 .signal-control:focus-visible { outline: 2px solid #e2bd70; outline-offset: -6px; }
-.signal-art { display: block; width: 100%; height: 100%; opacity: .76; pointer-events: none; }
-.auth-intro .auth-story > .signal-stage { inset: 0; width: 100%; height: 100%; }
-.auth-intro .signal-control { touch-action: pinch-zoom; }
-.auth-intro .signal-art {
+.auth.auth-intro > .signal-stage { inset: 0; }
+.signal-art {
   position: absolute; left: 50%; top: 50%;
-  width: min(100vw, 100dvh); height: min(100vw, 100dvh);
-  transform: translate(-50%, -50%);
+  width: min(100cqw, 100cqh); height: min(100cqw, 100cqh);
+  translate: -50% -50%; pointer-events: none; opacity: .85;
 }
-.auth-intro .signal-hint { top: 24px; right: clamp(20px, 4.8vw, 72px); }
 .auth-story > .signal-skip {
   position: absolute; z-index: 1; right: clamp(20px, 4.8vw, 72px); bottom: max(24px, env(safe-area-inset-bottom));
   min-height: 44px; padding: 8px 12px; border: 1px solid #54465e; border-radius: 6px;
-  background: #13111a; color: #e1d6e4; font: 650 13px/1.4 var(--sans); cursor: pointer;
+  background: #13111a; color: #e1d6e4; font: 650 13px/1.4 var(--sans); cursor: pointer; pointer-events: auto;
 }
 .signal-entry {
   position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; padding: 0; border: 0;
@@ -44,13 +48,7 @@
 .signal-entry:hover::before { background: #fff4bd; }
 .signal-skip:hover { border-color: #e1d6e4; }
 .signal-entry:focus-visible, .signal-skip:focus-visible { outline-color: #f8d676; }
-.signal-hint {
-  position: absolute; top: 14px; right: 15%; pointer-events: none;
-  padding: 4px 8px; border: 1px solid #54465e; border-radius: 999px;
-  background: #13111a; color: #e1d6e4; font: 600 11px/1.4 var(--mono);
-}
-.signal-copy { align-self: end; padding-block: 38px 10px; pointer-events: none; }
-.signal-copy > * { width: fit-content; pointer-events: auto; }
+.signal-copy { align-self: end; padding-block: 38px 10px; }
 .signal-copy .eyebrow { color: #e2bd70; margin-bottom: 13px; }
 .auth-line {
   color: #fbf3e4; font-family: "Segoe UI Variable Display", var(--sans);
@@ -60,6 +58,10 @@
 }
 .auth-story .muted { color: #e1d6e4; text-shadow: 0 1px 8px #13111a; margin-top: 14px; text-wrap: pretty; }
 .signal-footer { display: none; }
+.auth-panel {
+  grid-row: 2; grid-column: 1; z-index: 2;
+  display: grid; place-items: center; background: #f5f0e5;
+}
 .auth-form {
   --ink: #201c25; --ink-2: #4d4553; --ink-3: #64576a; --surface: #fffcf4;
   --line: #cfc3b2; --line-strong: #807587; --accent: #f8d676; --accent-ink: #37294b;
@@ -75,11 +77,16 @@
 .auth-form .field input { min-height: 48px; }
 .auth-form .field .button { min-height: 48px; }
 @media (prefers-reduced-motion: no-preference) {
-  .auth-reveal { animation: auth-reveal 280ms cubic-bezier(.2, .75, .25, 1) both; }
-  @keyframes auth-reveal {
-    from { opacity: .4; transform: translateY(14px); }
-    to { opacity: 1; transform: translateY(0); }
+  .auth-opened > .auth-panel {
+    animation: auth-reveal 640ms cubic-bezier(.2, .75, .25, 1) both;
+    --panel-enter: translateY(100%);
   }
+  .auth-opened :is(.signal-copy, .signal-footer) { animation: auth-copy 360ms 180ms ease-out both; }
+  @keyframes auth-reveal {
+    from { transform: var(--panel-enter); }
+    to { transform: none; }
+  }
+  @keyframes auth-copy { from { opacity: 0; } to { opacity: 1; } }
 }
 .brand .brand-mark {
   flex: none; width: 26px; height: 26px; background: url('/favicon.svg') center / contain no-repeat;
@@ -93,13 +100,13 @@
 .rail-compact .rail nav { display: none; }
 @media (max-width: 470px) {
   .rail-foot .connection { display: none; }
-  .auth-intro .signal-hint { top: 76px; right: 50%; transform: translateX(50%); white-space: nowrap; }
 }
 @media (min-width: 900px) {
-  .auth-story { min-height: 100dvh; padding-block: 38px 30px; }
-  .auth-story > .signal-stage { right: -1%; top: 5%; width: 90%; height: 62%; }
-  .signal-art { opacity: 1; }
-  .signal-hint { right: 5%; }
+  .auth { grid-template-rows: minmax(100dvh, auto); }
+  .auth > .auth-story { min-height: 100dvh; padding-block: 38px 30px; }
+  .auth > .signal-stage { inset: 5% -1% 33% 11%; }
+  .auth-panel { grid-row: 1; grid-column: 2; }
+  .auth-opened > .auth-panel { --panel-enter: translateX(100%); }
   .auth-line { text-shadow: none; }
   .signal-copy { padding-bottom: clamp(30px, 5vh, 65px); padding-top: min(30vh, 220px); }
   .signal-footer {

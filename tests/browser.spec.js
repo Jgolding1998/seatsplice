@@ -50,6 +50,18 @@ async function sphereDifference(control, reference) {
   return current.reduce((sum, pixel, i) => sum + Math.abs(pixel - reference[i]), 0) / current.length;
 }
 
+async function sphereSpread(control) {
+  const image = await sphereImage(control);
+  if (!image) return 0;
+  let total = 0;
+  let weighted = 0;
+  image.forEach((alpha, i) => {
+    total += alpha;
+    weighted += alpha * ((i % 32 - 15.5) ** 2 + (Math.floor(i / 32) - 15.5) ** 2);
+  });
+  return weighted / total;
+}
+
 test('sign-in sphere follows mouse drag and supports keyboard rotation and reset', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
@@ -75,6 +87,13 @@ test('sign-in sphere follows mouse drag and supports keyboard rotation and reset
   await expect.poll(() => sphereDifference(sphere, dragged)).toBeGreaterThan(.5);
   await sphere.press('Home');
   await expect.poll(() => sphereDifference(sphere, original)).toBeLessThan(.25);
+  for (let i = 0; i < 12; i++) await sphere.press('ArrowUp');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const pastPole = await sphereImage(sphere);
+  await sphere.press('ArrowUp');
+  await expect.poll(() => sphereDifference(sphere, pastPole)).toBeGreaterThan(.5);
+  await sphere.press('Home');
+  await expect.poll(() => sphereDifference(sphere, original)).toBeLessThan(.25);
   await sphere.press('Enter');
   await expect.poll(() => sphereDifference(sphere, original)).toBeGreaterThan(.5);
   await sphere.press('Home');
@@ -94,7 +113,7 @@ test('sign-in sphere follows mouse drag and supports keyboard rotation and reset
   )).toBe(true);
 });
 
-test('sign-in sphere supports touch swipe and tap on a phone', async ({ browser, baseURL }) => {
+test('sign-in sphere supports pinch zoom, swipe and tap on a phone', async ({ browser, baseURL }) => {
   const context = await browser.newContext({
     baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce'
   });
@@ -107,6 +126,20 @@ test('sign-in sphere supports touch swipe and tap on a phone', async ({ browser,
     const { x, y, width, height } = await sphere.boundingBox();
     const start = { x: Math.round(x + width * .67), y: Math.round(y + height * .36) };
     const touch = await context.newCDPSession(page);
+    async function pinch(center, from, to) {
+      const pair = spread => [
+        { id: 0, x: center.x - spread, y: center.y },
+        { id: 1, x: center.x + spread, y: center.y }
+      ];
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pair(from) });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pair(to) });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    }
+    const normalSpread = await sphereSpread(sphere);
+    await pinch({ x: Math.round(x + width / 2), y: start.y }, 40, 55);
+    await expect.poll(() => sphereSpread(sphere)).toBeGreaterThan(normalSpread * 1.15);
+    await pinch({ x: Math.round(x + width / 2), y: start.y }, 55, 40);
+    await expect.poll(() => sphereDifference(sphere, original)).toBeLessThan(.25);
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
     await touch.send('Input.dispatchTouchEvent', {
       type: 'touchMove', touchPoints: [{ x: start.x + 23, y: start.y + 47 }]
@@ -123,6 +156,15 @@ test('sign-in sphere supports touch swipe and tap on a phone', async ({ browser,
     await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await page.getByRole('button', { name: 'Open sign-in' }).tap();
     await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
+    const art = sphere.locator('canvas');
+    const smaller = await art.boundingBox();
+    expect(smaller.width).toBeLessThan(width);
+    const panel = await page.locator('.auth-panel').boundingBox();
+    expect(smaller.y + smaller.height / 2).toBeLessThan(panel.y);
+    await expect.poll(() => sphereSpread(sphere)).toBeGreaterThan(0);
+    const afterOpen = await sphereSpread(sphere);
+    await pinch({ x: Math.round(smaller.x + smaller.width / 2), y: Math.round(smaller.y + smaller.height / 2) }, 36, 50);
+    await expect.poll(() => sphereSpread(sphere)).toBeGreaterThan(afterOpen * 1.15);
   } finally {
     await context.close();
   }
@@ -149,11 +191,46 @@ test('sign-in sphere coasts briefly after a flick and then comes to rest', async
   await page.mouse.move(x + width * .59, y + height * .4, { steps: 8 });
   await page.mouse.up();
   await expect.poll(() => page.evaluate(() => window.spherePaintsAfterRelease)).toBeGreaterThan(2);
-  // Give the documented 320 ms coast time to finish before sampling for stability.
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(850);
   const settled = await sphereImage(sphere);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   expect(await sphereDifference(sphere, settled)).toBeLessThan(.25);
+});
+
+test('the same sphere glides into the login layout while the form slides in', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const sphere = page.getByRole('button', { name: 'Rotate particle sphere' });
+  const art = sphere.locator('canvas');
+  const before = await art.boundingBox();
+  await sphere.press('Home');
+  await sphere.press('ArrowLeft');
+  await sphere.press('ArrowLeft');
+  await page.getByRole('button', { name: 'Open sign-in' }).press('Enter');
+  const positions = await art.evaluate(canvas => {
+    const glide = canvas.getAnimations()[0];
+    const panel = document.querySelector('.auth-panel');
+    const slide = panel.getAnimations()[0];
+    if (!glide || !slide) throw new Error('Expected the sphere and panel to animate');
+    glide.pause();
+    slide.pause();
+    glide.currentTime = slide.currentTime = 0;
+    const start = canvas.getBoundingClientRect().toJSON();
+    const panelStart = panel.getBoundingClientRect().left;
+    glide.currentTime = slide.currentTime = 320;
+    const middle = canvas.getBoundingClientRect().width;
+    glide.finish();
+    slide.finish();
+    return { start, middle, end: canvas.getBoundingClientRect().width,
+      panelStart, panelEnd: panel.getBoundingClientRect().left };
+  });
+  expect(positions.start.x).toBeCloseTo(before.x, 0);
+  expect(positions.start.y).toBeCloseTo(before.y, 0);
+  expect(positions.start.width).toBeCloseTo(before.width, 0);
+  expect(positions.middle).toBeLessThan(before.width);
+  expect(positions.end).toBeLessThan(positions.middle);
+  expect(positions.panelStart).toBeGreaterThan(positions.panelEnd);
+  await expect(page.getByRole('heading', { name: 'Log in' })).toBeFocused();
 });
 
 test('versioned assets are cacheable and missing bundles return 404 instead of the app shell', async ({ request }) => {

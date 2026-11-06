@@ -4,10 +4,9 @@ const count = 4200;
 const initialYaw = -.6;
 const initialPitch = .263;
 const radiusScale = .42;
-const pitchLimit = 1.2;
 const keyStep = .18;
 const introDuration = 1100;
-const coastDuration = 320;
+const coastDuration = 760;
 const directions = { ArrowLeft: [-keyStep, 0], ArrowRight: [keyStep, 0],
   ArrowUp: [0, -keyStep], ArrowDown: [0, keyStep] };
 const initialSin = Math.sin(initialYaw);
@@ -15,6 +14,7 @@ const initialCos = Math.cos(initialYaw);
 const tiltSin = Math.sin(initialPitch);
 const tiltCos = Math.cos(initialPitch);
 const dot = { x: .8, y: .22, z: -Math.sqrt(1 - .8 ** 2 - .22 ** 2) };
+const initialRotation = [0, 0, 0, 1];
 let cloud;
 
 const sourceArt = [
@@ -42,17 +42,45 @@ function makePoint(_, i) {
   const side = u + v * .55 >= 0 ? 1 : -1;
   const scatter = .87 + .25 * grain;
   // Place the split in the sphere itself so it turns with the particles.
-  return [
-    x * scatter + side * (.042 * initialCos + .018 * tiltSin * initialSin),
-    y * scatter + side * .018 * tiltCos,
-    z * scatter + side * (.042 * initialSin - .018 * tiltSin * initialCos),
-    grain
-  ];
+  return [u * scatter + .042 * side, v * scatter + .018 * side,
+    (y * tiltSin + (z * initialCos - x * initialSin) * tiltCos) * scatter, grain];
 }
 const shades = ['#544760', '#866ea0', '#aa8ec8', '#ebc975', '#fff1b8'];
-const clampPitch = angle => Math.max(-pitchLimit, Math.min(pitchLimit, angle));
 
-export function SignalArt({ onOpenSignIn }) {
+// Compose each gesture in screen coordinates so the rotation never hits a pole.
+function turn(rotation, dx, dy, twist = 0) {
+  const angle = Math.hypot(dx, dy, twist);
+  if (!angle) return rotation;
+  const factor = Math.sin(angle / 2) / angle;
+  const ax = -dy * factor;
+  const ay = dx * factor;
+  const az = twist * factor;
+  const aw = Math.cos(angle / 2);
+  const [x, y, z, w] = rotation;
+  return [
+    aw * x + ax * w + ay * z - az * y,
+    aw * y - ax * z + ay * w + az * x,
+    aw * z + ax * y - ay * x + az * w,
+    aw * w - ax * x - ay * y - az * z
+  ];
+}
+
+function matrix([x, y, z, w]) {
+  return [
+    1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w),
+    2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w),
+    2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)
+  ];
+}
+
+const dotDepth = dot.z * initialCos - dot.x * initialSin;
+const dotPosition = [
+  dot.x * initialCos + dot.z * initialSin,
+  dot.y * tiltCos - dotDepth * tiltSin,
+  dot.y * tiltSin + dotDepth * tiltCos
+];
+
+export function SignalArt({ artRef, onOpenSignIn }) {
   const ref = useRef(null);
   const dotRef = useRef(null);
   const dotTouch = useRef(null);
@@ -69,11 +97,13 @@ export function SignalArt({ onOpenSignIn }) {
     let frame = 0;
     let introStart;
     let intro = true;
-    let yaw = initialYaw;
-    let pitch = initialPitch;
+    let rotation = initialRotation;
+    let zoom = 1;
     let inView = false;
     let dirty = false;
     let drag = null;
+    let pinch = null;
+    const pointers = new Map();
     let coast = null;
     let suppressClick = false;
     let width = 0;
@@ -82,20 +112,20 @@ export function SignalArt({ onOpenSignIn }) {
     function paint() {
       if (!width || !height) return;
       ctx.clearRect(0, 0, width, height);
-      const radius = Math.min(width, height) * radiusScale;
-      const sy = Math.sin(yaw);
-      const cy = Math.cos(yaw);
-      const sp = Math.sin(pitch);
-      const cp = Math.cos(pitch);
+      const diameter = Math.min(width, height);
+      const radius = diameter * radiusScale * zoom;
+      const pointScale = diameter / Math.max(1, Math.min(window.innerWidth, window.innerHeight));
+      const [a, b, c, d, e, f, g, h, i] = matrix(rotation);
+      const compact = window.innerWidth < 600;
       for (const [x, y, z, grain] of points) {
-        if (width < 420 && grain < .5) continue;
-        const u = x * cy + z * sy;
-        const depth = z * cy - x * sy;
-        const v = y * cp - depth * sp;
+        if (compact && grain < .5) continue;
+        const u = a * x + b * y + c * z;
+        const v = d * x + e * y + f * z;
+        const depth = g * x + h * y + i * z;
         const lit = Math.max(0, Math.min(.999, .30 + .20 * depth - .25 * v - .18 * u + .29 * grain));
-        const px = width * .5 + u * radius + 5 * (grain - .5);
+        const px = width * .5 + u * radius + 5 * pointScale * (grain - .5);
         const py = height * .5 + v * radius;
-        const size = grain > .96 ? 1.9 : .65 + .75 * grain;
+        const size = (grain > .96 ? 1.9 : .65 + .75 * grain) * pointScale * Math.min(zoom, 1.8);
         ctx.globalAlpha = .20 + .80 * lit;
         ctx.fillStyle = shades[Math.floor(lit * shades.length)];
         ctx.fillRect(px, py, size, size);
@@ -103,14 +133,16 @@ export function SignalArt({ onOpenSignIn }) {
       ctx.globalAlpha = 1;
       const entry = dotRef.current;
       if (entry) {
-        const horizontal = dot.x * cy + dot.z * sy;
-        const depth = dot.z * cy - dot.x * sy;
-        const vertical = dot.y * cp - depth * sp;
-        const facesViewer = dot.y * sp + depth * cp > .26;
-        const hide = !facesViewer && document.activeElement !== entry;
+        const [x, y, z] = dotPosition;
+        const horizontal = (a * x + b * y + c * z) * radius;
+        const vertical = (d * x + e * y + f * z) * radius;
+        const facesViewer = g * x + h * y + i * z > .26;
+        const reachable = Math.abs(horizontal) < width / 2 - 24 && Math.abs(vertical) < height / 2 - 24;
+        const show = facesViewer && reachable;
+        const hide = !show && document.activeElement !== entry;
         if (entry.hidden !== hide) entry.hidden = hide;
-        if (facesViewer) {
-          entry.style.transform = `translate(${horizontal * radius}px, ${vertical * radius}px)`;
+        if (show) {
+          entry.style.transform = `translate(${horizontal}px, ${vertical}px)`;
         }
       }
     }
@@ -119,14 +151,13 @@ export function SignalArt({ onOpenSignIn }) {
       if (intro && !motion.matches) {
         introStart ??= now;
         const progress = Math.min(1, (now - introStart) / introDuration);
-        yaw = initialYaw + .65 * (1 - (1 - progress) ** 2);
+        rotation = turn(initialRotation, .65 * (1 - (1 - progress) ** 2), 0);
         intro = progress < 1;
         dirty = true;
       } else if (coast) {
         const progress = Math.min(1, (now - coast.start) / coastDuration);
-        const eased = 1 - (1 - progress) ** 2;
-        yaw = coast.yaw + coast.dx * eased;
-        pitch = clampPitch(coast.pitch - coast.dy * eased);
+        const eased = 1 - (1 - progress) ** 3;
+        rotation = turn(coast.rotation, coast.dx * eased, coast.dy * eased);
         if (progress === 1) coast = null;
         dirty = true;
       }
@@ -146,9 +177,14 @@ export function SignalArt({ onOpenSignIn }) {
       }
     }
 
-    function move(dx, dy) {
-      yaw += dx;
-      pitch = clampPitch(pitch - dy);
+    function move(dx, dy, twist = 0) {
+      rotation = turn(rotation, dx, dy, twist);
+      dirty = true;
+      sync();
+    }
+
+    function scale(factor) {
+      zoom = Math.max(.55, Math.min(2.8, zoom * factor));
       dirty = true;
       sync();
     }
@@ -159,34 +195,69 @@ export function SignalArt({ onOpenSignIn }) {
     }
 
     function onPointerDown(event) {
-      if (drag || !event.isPrimary || event.button !== 0) return;
+      if (pointers.size >= 2 || event.button !== 0) return;
+      if (pointers.size && (event.pointerType !== 'touch' || pointers.values().next().value.type !== 'touch')) return;
       takeControl();
-      suppressClick = false;
-      const { pointerId, clientX, clientY, timeStamp } = event;
-      const radiansPerPixel = 1 / Math.max(60, Math.min(width, height) * radiusScale);
-      drag = { pointerId, x: clientX, y: clientY, timeStamp, radiansPerPixel, vx: 0, vy: 0 };
-      control.setPointerCapture(pointerId);
+      const point = { x: event.clientX, y: event.clientY, timeStamp: event.timeStamp, type: event.pointerType };
+      pointers.set(event.pointerId, point);
+      control.setPointerCapture(event.pointerId);
+      if (pointers.size === 2) {
+        pinch = pinchGeometry();
+        suppressClick = true;
+        drag = null;
+      } else {
+        suppressClick = false;
+        drag = { ...point, vx: 0, vy: 0 };
+      }
+    }
+
+    function pinchGeometry() {
+      const [first, second] = pointers.values();
+      const dx = second.x - first.x;
+      const dy = second.y - first.y;
+      return { distance: Math.max(1, Math.hypot(dx, dy)), angle: Math.atan2(dy, dx) };
     }
 
     function onPointerMove(event) {
-      if (drag?.pointerId !== event.pointerId) return;
+      const point = pointers.get(event.pointerId);
+      if (!point) return;
+      point.x = event.clientX;
+      point.y = event.clientY;
+      point.timeStamp = event.timeStamp;
+      if (pinch) {
+        const next = pinchGeometry();
+        scale(next.distance / pinch.distance);
+        const twist = next.angle - pinch.angle;
+        move(0, 0, Math.atan2(Math.sin(twist), Math.cos(twist)));
+        pinch = next;
+        return;
+      }
+      if (!drag) return;
       const dx = event.clientX - drag.x;
       const dy = event.clientY - drag.y;
       if (!suppressClick && Math.hypot(dx, dy) < 4) return;
       suppressClick = true;
       const elapsed = Math.max(8, event.timeStamp - drag.timeStamp);
-      const rotationX = dx * drag.radiansPerPixel;
-      const rotationY = dy * drag.radiansPerPixel;
+      const radiansPerPixel = 1 / Math.max(60, Math.min(width, height) * radiusScale * zoom);
+      const rotationX = dx * radiansPerPixel;
+      const rotationY = dy * radiansPerPixel;
       drag.x = event.clientX;
       drag.y = event.clientY;
       drag.timeStamp = event.timeStamp;
-      drag.vx = rotationX / elapsed;
-      drag.vy = rotationY / elapsed;
+      drag.vx = .25 * drag.vx + .75 * rotationX / elapsed;
+      drag.vy = .25 * drag.vy + .75 * rotationY / elapsed;
       move(rotationX, rotationY);
     }
 
     function onPointerEnd(event) {
-      if (drag?.pointerId !== event.pointerId) return;
+      if (!pointers.delete(event.pointerId)) return;
+      if (pinch) {
+        pinch = null;
+        const remaining = pointers.values().next().value;
+        drag = remaining ? { ...remaining, timeStamp: event.timeStamp, vx: 0, vy: 0 } : null;
+        return;
+      }
+      if (!drag) return;
       const { vx, vy, timeStamp } = drag;
       drag = null;
       if (event.type !== 'pointerup') return;
@@ -197,8 +268,10 @@ export function SignalArt({ onOpenSignIn }) {
         return;
       }
       if (!suppressClick || motion.matches || event.timeStamp - timeStamp > 80) return;
-      const distance = velocity => Math.max(-.85, Math.min(.85, velocity * coastDuration / 2));
-      coast = { start: performance.now(), yaw, pitch, dx: distance(vx), dy: distance(vy) };
+      const speed = Math.hypot(vx, vy);
+      if (speed < .0004) return;
+      const travel = Math.min(coastDuration / 3, 10 / speed);
+      coast = { start: performance.now(), rotation, dx: vx * travel, dy: vy * travel };
       sync();
     }
 
@@ -209,17 +282,21 @@ export function SignalArt({ onOpenSignIn }) {
     }
 
     function onKeyDown(event) {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.altKey || event.ctrlKey || event.metaKey || (event.shiftKey && event.key !== '+')) return;
       if (event.key === 'Home') {
         event.preventDefault();
         takeControl();
-        yaw = initialYaw;
-        pitch = initialPitch;
+        rotation = initialRotation;
+        zoom = 1;
         move(0, 0);
       } else if (Object.hasOwn(directions, event.key)) {
         event.preventDefault();
         takeControl();
         move(...directions[event.key]);
+      } else if (event.key === '+' || event.key === '=' || event.key === '-') {
+        event.preventDefault();
+        takeControl();
+        scale(event.key === '-' ? 1 / 1.2 : 1.2);
       }
     }
 
@@ -259,12 +336,10 @@ export function SignalArt({ onOpenSignIn }) {
   return (
     <div className="signal-stage">
       <button ref={ref} type="button" className="signal-control" aria-label="Rotate particle sphere" aria-describedby={helpId}>
-        <canvas className="signal-art" aria-hidden="true" />
-        <span className="signal-hint" aria-hidden="true">
-          {onOpenSignIn ? 'Spin to find the gold dot' : 'Drag to spin'}
-        </span>
+        <canvas ref={artRef} className="signal-art" aria-hidden="true" />
         <span id={helpId} className="visually-hidden">
-          Drag, swipe, or use the arrow keys to turn. Press Enter to spin or Home to reset.
+          Drag, swipe, or use the arrow keys to turn. Pinch or use plus and minus to zoom.
+          Press Enter to spin or Home to reset.
           {onOpenSignIn && ' Find the gold dot to open sign-in.'}
         </span>
       </button>

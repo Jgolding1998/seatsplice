@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import * as api from '../api.js';
 import { LIMITS, browserTimezone } from '../format.js';
 import { useAction } from '../hooks.js';
@@ -167,25 +167,45 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
   const [opened, setOpened] = useState(false);
   const [mode, setMode] = useState(invited ? 'signup' : 'login');
   const formRef = useRef(null);
+  const artRef = useRef(null);
+  const previousArt = useRef(null);
   const expanded = opened || invited || Boolean(notice);
   const title = mode === 'login' ? 'Log in' : 'Create your account';
   const Form = mode === 'login' ? LoginForm : SignupForm;
 
-  useEffect(() => {
-    if (opened) formRef.current?.querySelector('h1')?.focus();
+  function openSignIn() {
+    previousArt.current = artRef.current?.getBoundingClientRect();
+    setOpened(true);
+  }
+
+  useLayoutEffect(() => {
+    if (!opened) return undefined;
+    formRef.current?.querySelector('h1')?.focus({ preventScroll: true });
+    const art = artRef.current;
+    const before = previousArt.current;
+    previousArt.current = null;
+    if (!art || !before || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const after = art.getBoundingClientRect();
+    if (!before.width || !after.width) return undefined;
+    const dx = before.left + before.width / 2 - after.left - after.width / 2;
+    const dy = before.top + before.height / 2 - after.top - after.height / 2;
+    const animation = art.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(${before.width / after.width})` },
+      { transform: 'none' }
+    ], { duration: 640, easing: 'cubic-bezier(.2, .75, .25, 1)' });
+    return () => animation.cancel();
   }, [opened]);
 
   return (
-    <main className={expanded ? 'auth' : 'auth auth-intro'}>
+    <main className={expanded ? (opened ? 'auth auth-opened' : 'auth') : 'auth auth-intro'}>
       <section className="auth-story" aria-label="About Seatsplice">
         <p className="brand"><span className="brand-mark" aria-hidden="true" />Seatsplice</p>
         {!expanded && <>
           <h1 className="visually-hidden">Seatsplice</h1>
-          <button type="button" className="signal-skip" onClick={() => setOpened(true)}>
+          <button type="button" className="signal-skip" onClick={openSignIn}>
             Skip to sign-in
           </button>
         </>}
-        <SignalArt onOpenSignIn={expanded ? undefined : () => setOpened(true)} />
         {expanded && <div className="signal-copy">
           <p className="eyebrow">The hackathon team finder</p>
           <p className="auth-line">Find your people.</p>
@@ -193,13 +213,14 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
         </div>}
         {expanded && <p className="signal-footer">Bring your own rubber duck.</p>}
       </section>
-      {expanded && <section ref={formRef} className={opened ? 'auth-form auth-reveal' : 'auth-form'}>
+      <SignalArt artRef={artRef} onOpenSignIn={expanded ? undefined : openSignIn} />
+      {expanded && <section ref={formRef} className="auth-panel"><div className="auth-form">
         <Page key={mode} title={title} eyebrow={invited ? 'You have a team invite' : undefined}
           intro={invited ? 'Sign in or create an account, then confirm your invite.' : mode === 'login' ? 'Sign in to your team board.' : 'Tell teams what you can help build.'}>
           {notice && <p className="alert" role="status">{notice}</p>}
           <Form onSignedIn={onSignedIn} refreshSession={refreshSession} onSwitch={() => setMode(mode === 'login' ? 'signup' : 'login')} />
         </Page>
-      </section>}
+      </div></section>}
     </main>
   );
 }
