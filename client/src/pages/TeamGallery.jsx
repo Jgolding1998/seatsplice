@@ -106,8 +106,12 @@ export function GalleryPlaceholder() {
   );
 }
 
-export function TeamGallery({ teams, pageNumber }) {
-  const [selected, setSelected] = useState(null);
+export function TeamGallery({ teams, pageNumber, initialTeam, rememberTeam }) {
+  const [selected, setSelected] = useState(initialTeam);
+  function select(id) {
+    setSelected(id);
+    rememberTeam(id);
+  }
   const region = useRef(null);
   const touch = useRef(null);
   const swallowClickUntil = useRef(0);
@@ -115,13 +119,13 @@ export function TeamGallery({ teams, pageNumber }) {
   const active = Math.max(0, teams.findIndex(team => team.id === selected));
   const team = teams[active];
   const position = (pageNumber - 1) * 12 + active + 1;
-  const step = direction => setSelected(teams[(active + direction + count) % count].id);
+  const step = direction => select(teams[(active + direction + count) % count].id);
 
   function onKeys(event) {
     if (event.altKey || event.ctrlKey || event.metaKey || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
     if (event.key === 'Home' || event.key === 'End') {
-      setSelected(teams[event.key === 'Home' ? 0 : count - 1].id);
+      select(teams[event.key === 'Home' ? 0 : count - 1].id);
     } else {
       step(event.key === 'ArrowLeft' ? -1 : 1);
     }
@@ -170,7 +174,7 @@ export function TeamGallery({ teams, pageNumber }) {
               ) : (
                 <button type="button" className="crew-card" tabIndex={-1} disabled={hidden}
                   aria-label={`Show ${item.name}`} onClick={() => {
-                    setSelected(item.id);
+                    select(item.id);
                     region.current?.focus({ preventScroll: true });
                   }}>{content}</button>
               )}

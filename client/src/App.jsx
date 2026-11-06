@@ -47,6 +47,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   const [welcomePath, setWelcomePath] = useState(showWelcome ? route.path : null);
   const signOut = useAction();
   const main = useRef(null);
+  const boardMemory = useRef({ display: 'gallery', filters: '', cursors: [null], selected: null });
   useFocusRescue(main);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   const safeRefresh = useCallback(() => refreshSession().catch(() => null), [refreshSession]);
 
   const context = useMemo(() => ({
-    user, teamId, tick, announce, refreshSession: safeRefresh, ownTeam
+    user, teamId, tick, announce, refreshSession: safeRefresh, ownTeam, boardMemory
   }), [user, teamId, tick, announce, safeRefresh, ownTeam]);
 
   const handleLogout = () => signOut.run(async () => {
@@ -142,7 +143,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
             </Button>
           </div>
           <nav id="main-navigation" aria-label="Main">
-            <p className="rail-label" aria-hidden="true">Workspace / 01</p>
+            <p className="rail-label" aria-hidden="true">Workspace</p>
             <ul>
               {links.map(([path, label]) => (
                 <li key={path}>

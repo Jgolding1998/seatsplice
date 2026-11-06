@@ -13,7 +13,9 @@ export function createApp(db, {
   origin, secure = false, trustProxy = 0, staticDir, limits = {}, log = console, inviteSecret = developmentInviteSecret
 } = {}) {
   const app = express();
-  const events = createEvents(db, log);
+  let openBoardRead;
+  const clearBoardRead = () => { openBoardRead = undefined; };
+  const events = createEvents(db, log, clearBoardRead);
   const api = express.Router();
   const authRate = limits.auth ?? 120;
   const inviteRate = limits.invites ?? 10;
@@ -75,7 +77,17 @@ export function createApp(db, {
   api.get('/board', async (req, res) => {
     // The board is shared across all signed-in participants and never reads a user profile.
     if (!await auth.activeSession(db, req)) input.fail(401, 'SIGN_IN_REQUIRED', 'Sign in to continue.');
-    res.json(await teams.board(db, input.parse(input.filters, req.query)));
+    const filters = input.parse(input.filters, req.query);
+    if (filters.q || filters.skill || filters.cursor) return res.json(await teams.board(db, filters));
+    // Concurrent readers can share the outstanding snapshot of the first page.
+    // Clear it on settlement or a write so a later reader gets a fresh query.
+    if (!openBoardRead) {
+      const snapshot = teams.board(db, filters).finally(() => {
+        if (openBoardRead === snapshot) clearBoardRead();
+      });
+      openBoardRead = snapshot;
+    }
+    return res.json(await openBoardRead);
   });
   api.use(async (req, _res, next) => {
     req.auth = await auth.sessionUser(db, req);
@@ -91,7 +103,7 @@ export function createApp(db, {
     res.json(await teams.suggestions(db, req.auth.user));
   });
   api.get('/events', (req, res) => {
-    if (!events.open(res, req.auth)) input.fail(429, 'TOO_MANY_STREAMS', 'Close another Crewboard tab and retry.');
+    if (!events.open(res, req.auth)) input.fail(429, 'TOO_MANY_STREAMS', 'Close another Seatsplice tab and retry.');
   });
 
   function write(route, schema, action, { extraLimit, invite = false } = {}) {
@@ -109,6 +121,7 @@ export function createApp(db, {
         const nonce = randomBytes(16).toString('hex');
         return { ...await action(session, actor, req.params, data, codeFor(nonce)), nonce };
       });
+      clearBoardRead();
       if (!invite) return res.json(result);
       const { nonce, ...publicResult } = result;
       return res.json({ ...publicResult, code: codeFor(nonce) });

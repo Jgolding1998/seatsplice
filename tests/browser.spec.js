@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-async function signup(page, name, skill = 'React') {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Create an account' }).click();
+async function signup(page, name, skill = 'React', inviteUrl) {
+  await page.goto(inviteUrl ?? '/');
+  if (inviteUrl) await expect(page.getByText('You have a team invite')).toBeVisible();
+  else await page.getByRole('button', { name: 'Create an account' }).click();
   await page.getByLabel('Name', { exact: true }).fill(name);
   await page.getByLabel('Email', { exact: true }).fill(`${randomUUID()}@example.test`);
   await page.getByLabel('Password', { exact: true }).fill('fixture password for browser tests');
@@ -13,7 +14,7 @@ async function signup(page, name, skill = 'React') {
   await skills.fill(skill);
   await skills.press('Enter');
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  if (!inviteUrl) await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
 }
 
 async function makeTeam(page, name) {
@@ -143,6 +144,17 @@ test('automated accessibility checks pass on sign-in, board and team screens', a
   await scan();
 });
 
+test('dark system sign-in keeps failed login feedback accessible', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.getByLabel('Email', { exact: true }).fill('unknown@example.test');
+  await page.getByLabel('Password', { exact: true }).fill('unused fixture password');
+  await page.getByRole('button', { name: 'Log in' }).click();
+  await expect(page.getByRole('alert')).toContainText('The email or password is incorrect');
+  const scan = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+  expect(scan.violations).toEqual([]);
+});
+
 test('participant-supplied markup renders as text and does not run', async ({ page }) => {
   await signup(page, 'Security Fixture');
   const payload = '<img src=x onerror=window.crewboardInjected=1>';
@@ -165,8 +177,7 @@ test('an invite link waits for confirmation and claims its preapproved seat once
   const context = await browser.newContext({ baseURL });
   try {
     const guest = await context.newPage();
-    await signup(guest, 'Invite Guest');
-    await guest.goto(inviteUrl);
+    await signup(guest, 'Invite Guest', 'React', inviteUrl);
     await expect(guest.getByLabel('Invite code')).toHaveValue(/^[A-Za-z0-9_-]{22}$/);
     await expect(guest.getByRole('link', { name: 'My team' })).toHaveCount(0);
     await guest.getByRole('button', { name: 'Use code' }).click();
@@ -192,6 +203,10 @@ test('gallery shows live seat counts and supports arrows, swipe, and list view',
   const stage = gallery.locator('.crew-stage');
   await stage.dispatchEvent('pointerdown', { pointerType: 'touch', pointerId: 1, clientX: 180, clientY: 90 });
   await stage.dispatchEvent('pointerup', { pointerType: 'touch', pointerId: 1, clientX: 105, clientY: 92 });
+  await expect(gallery.getByRole('heading', { name: 'Stack Underflow' })).toBeVisible();
+  await gallery.getByRole('link', { name: 'View team' }).click();
+  await expect(page.getByRole('heading', { name: 'Stack Underflow' })).toBeVisible();
+  await page.goBack();
   await expect(gallery.getByRole('heading', { name: 'Stack Underflow' })).toBeVisible();
   await page.getByRole('button', { name: 'List', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Rubber Duck Debuggers' })).toBeVisible();

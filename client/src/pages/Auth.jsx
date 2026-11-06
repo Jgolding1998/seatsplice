@@ -19,6 +19,9 @@ function PasswordField({ value, onChange, error, hint, autoComplete }) {
             value={value}
             maxLength={LIMITS.password[1]}
             autoComplete={autoComplete}
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
             onChange={event => onChange(event.target.value)}
           />
           <Button aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? 'Hide' : 'Show'}</Button>
@@ -159,7 +162,9 @@ function SignupForm({ onSignedIn, refreshSession, onSwitch }) {
 }
 
 export function AuthPage({ notice, onSignedIn, refreshSession }) {
-  const [mode, setMode] = useState('login');
+  const invited = /^#\/join\?/.test(window.location.hash) &&
+    Boolean(new URLSearchParams(window.location.hash.split('?')[1]).get('code'));
+  const [mode, setMode] = useState(invited ? 'signup' : 'login');
   const title = mode === 'login' ? 'Log in' : 'Create your account';
   const Form = mode === 'login' ? LoginForm : SignupForm;
   return (
@@ -172,10 +177,11 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
           <p className="auth-line">Find your people.</p>
           <p className="muted">Find an open seat, start a team, or join with an invite code.</p>
         </div>
-        <p className="signal-footer" aria-hidden="true"><span>01 / TEAM FORMATION</span><span>Bring your own rubber duck.</span></p>
+        <p className="signal-footer">Bring your own rubber duck.</p>
       </section>
       <section className="auth-form">
-        <Page key={mode} title={title} intro={mode === 'login' ? 'Use your email to get back to the team board.' : 'Tell teams what you can help build.'}>
+        <Page key={mode} title={title} eyebrow={invited ? 'You have a team invite' : undefined}
+          intro={invited ? 'Sign in or create an account, then confirm your invite.' : mode === 'login' ? 'Sign in to your team board.' : 'Tell teams what you can help build.'}>
           {notice && <p className="alert" role="status">{notice}</p>}
           <Form onSignedIn={onSignedIn} refreshSession={refreshSession} onSwitch={() => setMode(mode === 'login' ? 'signup' : 'login')} />
         </Page>

@@ -1,6 +1,6 @@
 const boardChanges = new Set(['team_created', 'join_approved', 'invite_accepted', 'member_left', 'member_removed', 'team_deleted']);
 
-export function createEvents(db, log = console) {
+export function createEvents(db, log = console, onBoardChange = () => {}) {
   const streams = new Set();
   const perUser = new Map();
   let watch;
@@ -22,8 +22,9 @@ export function createEvents(db, log = console) {
     const audit = change.fullDocument;
     for (const userId of audit.audience ?? []) notified.add(userId);
     if (!batchTimer) batchTimer = setTimeout(() => { batchTimer = null; flush(false); }, 175);
-    if (boardChanges.has(audit.action) && !boardTimer) {
-      boardTimer = setTimeout(() => { boardTimer = null; flush(true); }, 1100);
+    if (boardChanges.has(audit.action)) {
+      onBoardChange();
+      if (!boardTimer) boardTimer = setTimeout(() => { boardTimer = null; flush(true); }, 1100);
     }
   }
 

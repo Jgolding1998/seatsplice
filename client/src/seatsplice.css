@@ -12,25 +12,27 @@
 .signal-copy { align-self: end; padding-block: 38px 10px; }
 .signal-copy .eyebrow { color: #e2bd70; margin-bottom: 13px; }
 .auth-line {
-  color: #fbf3e4; font-size: clamp(37px, 6vw, 88px); line-height: .91;
-  max-width: 10ch; text-wrap: balance; letter-spacing: -.075em;
+  color: #fbf3e4; font-family: "Segoe UI Variable Display", var(--sans);
+  font-size: clamp(37px, 5.4vw, 79px); line-height: 1;
+  max-width: 11ch; text-wrap: balance; letter-spacing: -.058em;
   text-shadow: 0 2px 22px #13111a, 0 2px 12px #13111a;
 }
-.auth-story .muted { color: #e1d6e4; text-shadow: 0 1px 8px #13111a; margin-top: 14px; }
+.auth-story .muted { color: #e1d6e4; text-shadow: 0 1px 8px #13111a; margin-top: 14px; text-wrap: pretty; }
 .signal-footer { display: none; }
 .auth-form {
   --ink: #201c25; --ink-2: #4d4553; --ink-3: #64576a; --surface: #fffcf4;
   --line: #cfc3b2; --line-strong: #807587; --accent: #f8d676; --accent-ink: #37294b;
-  --hover: #ece3d3; --focus: #69448d; --danger: #9b2737;
+  --hover: #ece3d3; --focus: #69448d; --danger: #9b2737; --danger-wash: #f9e8df;
   background: transparent; color: var(--ink); padding: 28px clamp(20px, 5vw, 56px) 40px;
 }
 .auth-form .page-head { margin: 0 0 23px; }
 .auth-form .page-head h1 { font-size: clamp(35px, 5vw, 54px); }
-.auth-form .page-intro { max-width: 37ch; }
+.auth-form .page-intro { max-width: 37ch; text-wrap: pretty; }
 .auth-form form > .row:last-child { display: grid; margin-top: 23px; }
 .auth-form .button-primary { color: #241d29; background: #f8d676; border-color: #9d7429; }
 .auth-form .button-primary:hover { background: #ffdf91; }
 .auth-form .field input { min-height: 48px; }
+.auth-form .field .button { min-height: 48px; }
 .brand .brand-mark {
   flex: none; width: 26px; height: 26px; background: url('/favicon.svg') center / contain no-repeat;
   border-radius: 0; transform: none;
@@ -47,9 +49,10 @@
 @media (min-width: 900px) {
   .auth-story { min-height: 100dvh; padding-block: 38px 30px; }
   .signal-art { right: -1%; top: 5%; width: 90%; height: 62%; opacity: 1; }
+  .auth-line { text-shadow: none; }
   .signal-copy { padding-bottom: clamp(30px, 5vh, 65px); padding-top: min(30vh, 220px); }
   .signal-footer {
-    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px;
     padding-top: 15px; border-top: 1px solid #54465e; color: #d2c4db;
     font: 600 10px/1.4 var(--mono); letter-spacing: .11em; text-transform: uppercase;
   }

@@ -24,11 +24,15 @@ function TeamRow({ team, position }) {
 }
 
 export function BoardPage({ initial }) {
-  const { tick, teamId, announce } = useApp();
+  const { tick, teamId, boardMemory } = useApp();
   const [q, setQ] = useState(() => (initial.get('q') ?? '').slice(0, LIMITS.query));
   const [skill, setSkill] = useState(() => (initial.get('skill') ?? '').slice(0, LIMITS.skillLength));
-  const [cursors, setCursors] = useState([null]);
-  const [display, setDisplay] = useState('gallery');
+  const [cursors, setCursors] = useState(() => {
+    const initialFilters = JSON.stringify([q.trim(), skill.trim()]);
+    return initialFilters === boardMemory.current.filters ? boardMemory.current.cursors : [null];
+  });
+  const [display, setDisplay] = useState(() => boardMemory.current.display);
+  const [resultNotice, setResultNotice] = useState('');
   const results = useRef(null);
   const searchInput = useRef(null);
   const focusResults = useRef(false);
@@ -72,16 +76,20 @@ export function BoardPage({ initial }) {
   const describedKey = useRef(null);
   const resultKey = JSON.stringify([filters, pageNumber]);
   useEffect(() => {
+    boardMemory.current = { ...boardMemory.current, display, filters, cursors: pageCursors };
+  }, [boardMemory, display, filters, pageCursors]);
+
+  useEffect(() => {
     if (board.loading || !board.data) return;
     if (describedKey.current !== null && describedKey.current !== resultKey) {
-      announce(`${plural(teams.length, 'team')} on page ${pageNumber}`);
+      setResultNotice(`${plural(teams.length, 'team')} on page ${pageNumber}`);
     }
     describedKey.current = resultKey;
     if (focusResults.current) {
       focusResults.current = false;
       results.current?.focus();
     }
-  }, [board.loading, board.data, resultKey, teams.length, pageNumber, announce]);
+  }, [board.loading, board.data, resultKey, teams.length, pageNumber]);
 
   const filtered = Boolean(searchedQ || searchedSkill);
   const clearFilters = () => {
@@ -101,7 +109,8 @@ export function BoardPage({ initial }) {
   };
 
   return (
-    <Page title="Find a team" intro="Browse open seats, then view a team to request to join.">
+    <Page title="Find a team" intro="Find an open seat and ask to join.">
+      <p className="visually-hidden" role="status">{resultNotice}</p>
       <form className="filters" role="search" onSubmit={event => event.preventDefault()}>
         <Field label="Search teams" hint="Name, description or skill">
           {field => <input {...field} ref={searchInput} type="search" value={q} maxLength={LIMITS.query} onChange={event => setQ(event.target.value)} />}
@@ -152,7 +161,9 @@ export function BoardPage({ initial }) {
         )}
 
         {teams.length > 0 && (display === 'gallery' ? (
-          <TeamGallery key={resultKey} teams={teams} pageNumber={pageNumber} />
+          <TeamGallery key={resultKey} teams={teams} pageNumber={pageNumber}
+            initialTeam={boardMemory.current.selected?.key === resultKey ? boardMemory.current.selected.id : null}
+            rememberTeam={id => { boardMemory.current.selected = { key: resultKey, id }; }} />
         ) : (
           <ul className="board-list" aria-busy={board.loading}>
             {teams.map((team, index) => <TeamRow key={team.id} team={team} position={(pageNumber - 1) * 12 + index + 1} />)}

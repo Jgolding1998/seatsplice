@@ -33,15 +33,16 @@ export function SignalArt() {
       const s = Math.sin(angle);
       const c = Math.cos(angle);
       for (let i = 0; i < cloud.length; i++) {
-        if (width < 420 && i % 2) continue;
         const [x, y, z, grain] = cloud[i];
+        if (width < 420 && grain < .5) continue;
         const u = x * c + z * s;
         const depth = z * c - x * s;
         const v = y * .965 - depth * .26;
-        const lit = Math.max(0, Math.min(.999, .35 + .24 * depth - .25 * v - .18 * u + .23 * grain));
-        const scatter = .90 + .21 * grain;
-        const px = width * .5 + u * radius * scatter;
-        const py = height * .5 + v * radius * scatter;
+        const lit = Math.max(0, Math.min(.999, .30 + .20 * depth - .25 * v - .18 * u + .29 * grain));
+        const scatter = .87 + .25 * grain;
+        const half = (u + v * .55) >= 0 ? 1 : -1;
+        const px = width * .5 + (u * scatter + .042 * half) * radius + 5 * (grain - .5);
+        const py = height * .5 + (v * scatter + .018 * half) * radius;
         const size = grain > .96 ? 1.9 : .65 + .75 * grain;
         ctx.globalAlpha = .20 + .80 * lit;
         ctx.fillStyle = shades[Math.floor(lit * shades.length)];

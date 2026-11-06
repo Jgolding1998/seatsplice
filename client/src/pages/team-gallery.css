@@ -240,7 +240,7 @@
 }
 .crew-gallery-details p { flex: 1 1 290px; }
 .crew-gallery-details .skills li { background: #383842; color: var(--gallery-text); }
-.crew-open-count { color: var(--gallery-text); display: flex; align-items: center; gap: 8px; font: 650 11px/1 var(--mono); }
+.crew-open-count { color: var(--gallery-text); display: flex; align-items: center; gap: 8px; font: 650 13px/1.2 var(--mono); }
 .crew-open-count .seat { width: 11px; height: 13px; border-color: #b0aebc; }
 .crew-open-count .seat-taken { background: var(--gallery-accent); border-color: var(--gallery-accent); }
 .crew-open-count .seat-last { background: transparent; border-color: var(--gallery-accent); }
@@ -263,8 +263,12 @@
 .crew-placeholder-line { width: min(250px, 70%); height: 15px; border-radius: 2px; background: #454451; }
 
 @media (max-width: 600px) {
+  .board-view .filters { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); column-gap: 10px; }
+  .board-view .filters .button { grid-column: 1 / -1; margin-bottom: 2px; }
+  .board-view .filters .field-hint { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+  .board-view .page-head { margin-bottom: 13px; }
   .crew-gallery { --cover-hop: clamp(83px, 30vw, 121px); }
-  .crew-stage { height: 287px; }
+  .crew-stage { height: 272px; }
   .crew-stage-index { bottom: 8px; }
   .crew-cover[data-slot="-2"], .crew-cover[data-slot="2"],
   .crew-cover[data-slot="-3"], .crew-cover[data-slot="3"] { visibility: hidden; }
