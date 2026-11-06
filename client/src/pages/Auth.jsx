@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import * as api from '../api.js';
 import { LIMITS, browserTimezone } from '../format.js';
 import { useAction } from '../hooks.js';
-import { Button, Field, FormError, Page, SeatRow, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
+import { Button, Field, FormError, Page, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
+import { CoverArt } from './TeamGallery.jsx';
 
 const looksLikeEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -165,17 +166,18 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
     <main className="auth">
       <section className="auth-story" aria-label="About Crewboard">
         <p className="brand"><span className="brand-mark" aria-hidden="true" />Crewboard</p>
-        <p className="auth-kicker">Hackathon field guide / 01</p>
-        <p className="auth-line">Find your crew. <span>Ship weird stuff.</span></p>
-        <div className="auth-seats" aria-hidden="true"><SeatRow memberCount={5} minSize={2} maxSize={6} /></div>
-        <p className="auth-caption"><strong>1 SEAT OPEN</strong> · Snack budget negotiable.</p>
-        <p className="muted">Find people who build what you don’t. Browse open teams, request a seat, or join with an invite code.</p>
+        <p className="auth-line">Find your hackathon team.</p>
+        <p className="muted">Browse open teams, request a seat, or join with an invite code.</p>
+        <div className="welcome-print" aria-hidden="true">
+          <span>CREWBOARD / FIELD RECORD 01</span>
+          <CoverArt index={0} />
+          <strong>RUBBER DUCK<br />DEBUGGING CLUB</strong>
+        </div>
       </section>
       <section className="auth-form">
         <Page key={mode} title={title}>
           {notice && <p className="alert" role="status">{notice}</p>}
           <Form onSignedIn={onSignedIn} refreshSession={refreshSession} onSwitch={() => setMode(mode === 'login' ? 'signup' : 'login')} />
-          <p className="muted auth-note">New to Crewboard? Create an account and put your skills on the map.</p>
         </Page>
       </section>
     </main>

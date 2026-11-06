@@ -236,19 +236,23 @@ function Invites({ team }) {
           <label htmlFor="invite-code">Code</label>
           <div className="row row-tight">
             <input ref={codeInput} id="invite-code" className="mono" readOnly value={invite.code} onFocus={event => event.target.select()} />
-            <Button onClick={() => copy(invite.code, 'Code', codeInput.current)}>Copy code</Button>
+            <Button data-copied={copied === 'Code copied'} onClick={() => copy(invite.code, 'Code', codeInput.current)}>
+              {copied === 'Code copied' ? '✓ Copied' : 'Copy code'}
+            </Button>
           </div>
           <label htmlFor="invite-link">Link</label>
           <div className="row row-tight">
             <input ref={linkInput} id="invite-link" className="mono" readOnly value={link} onFocus={event => event.target.select()} />
-            <Button onClick={() => copy(link, 'Link', linkInput.current)}>Copy link</Button>
+            <Button data-copied={copied === 'Link copied'} onClick={() => copy(link, 'Link', linkInput.current)}>
+              {copied === 'Link copied' ? '✓ Copied' : 'Copy link'}
+            </Button>
           </div>
           <p className="muted">Expires <Time value={invite.expiresAt} /></p>
         </div>
       )}
       {invite && expired && <p className="callout">That code has expired. Create a new one.</p>}
       <p className="visually-hidden" role="status">{copied}</p>
-      {copied && <p className="muted" aria-hidden="true">{copied}</p>}
+      {copied.startsWith('Could not') && <p className="muted" aria-hidden="true">{copied}</p>}
       <InlineError error={action.error} />
       {full
         ? <p className="muted">The team is full, so new codes are not available.</p>

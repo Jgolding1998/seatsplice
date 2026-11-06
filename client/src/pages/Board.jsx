@@ -3,6 +3,7 @@ import * as api from '../api.js';
 import { LIMITS, formatClock, plural } from '../format.js';
 import { useApp, useDebounced, useResource } from '../hooks.js';
 import { Button, Empty, Field, LoadError, Loading, Page, Seats, Skills, Zone } from '../ui.jsx';
+import { GalleryPlaceholder, TeamGallery } from './TeamGallery.jsx';
 
 function TeamRow({ team, position }) {
   return (
@@ -14,7 +15,10 @@ function TeamRow({ team, position }) {
         {team.description && <p className="board-description">{team.description}</p>}
       </div>
       <Skills skills={team.skills} label={`Skills for ${team.name}`} />
-      <Seats team={team} />
+      <div>
+        <p>{plural(team.maxSize - team.memberCount, 'open seat')}</p>
+        <Seats team={team} />
+      </div>
     </li>
   );
 }
@@ -24,6 +28,7 @@ export function BoardPage({ initial }) {
   const [q, setQ] = useState(() => (initial.get('q') ?? '').slice(0, LIMITS.query));
   const [skill, setSkill] = useState(() => (initial.get('skill') ?? '').slice(0, LIMITS.skillLength));
   const [cursors, setCursors] = useState([null]);
+  const [display, setDisplay] = useState('gallery');
   const results = useRef(null);
   const searchInput = useRef(null);
   const focusResults = useRef(false);
@@ -96,7 +101,7 @@ export function BoardPage({ initial }) {
   };
 
   return (
-    <Page title="Board" eyebrow="Matchmaking / open seats" intro="Find your missing dependency. Full teams drop off the board automatically.">
+    <Page title="Find a team" intro="Browse open seats, then view a team to request to join.">
       <form className="filters" role="search" onSubmit={event => event.preventDefault()}>
         <Field label="Search teams" hint="Name, description or skill">
           {field => <input {...field} ref={searchInput} type="search" value={q} maxLength={LIMITS.query} onChange={event => setQ(event.target.value)} />}
@@ -117,6 +122,11 @@ export function BoardPage({ initial }) {
       <section aria-labelledby="board-results">
         <div className="section-head">
           <h2 id="board-results" ref={results} tabIndex={-1}>Open teams, page {pageNumber}</h2>
+          <div className="row board-display" role="group" aria-label="Board view">
+            <Button aria-pressed={display === 'gallery'} onClick={() => setDisplay('gallery')}>Gallery</Button>
+            <Button aria-pressed={display === 'list'} onClick={() => setDisplay('list')}>List</Button>
+          </div>
+          {!teamId && <a className="button board-create" href="#/new">Create team <span aria-hidden="true">+</span></a>}
           {board.stale && board.updatedAt && <p className="muted">Could not refresh. Showing teams from {formatClock(board.updatedAt)}</p>}
         </div>
 
@@ -125,12 +135,13 @@ export function BoardPage({ initial }) {
             {pageNumber > 1 && <Button onClick={() => setCursors([null])}>Back to first page</Button>}
           </LoadError>
         )}
-        {!board.data && board.loading && <Loading label="Loading teams" kind="board" rows={4} />}
+        {!board.data && board.loading && (display === 'gallery'
+          ? <GalleryPlaceholder />
+          : <Loading label="Loading teams" kind="board" rows={4} />)}
 
         {board.data && teams.length === 0 && (
           filtered ? (
             <Empty title="No open teams match these filters">
-              <p className="muted">Even the rubber duck came up empty.</p>
               <Button onClick={clearFilters}>Clear filters</Button>
             </Empty>
           ) : (
@@ -140,11 +151,13 @@ export function BoardPage({ initial }) {
           )
         )}
 
-        {teams.length > 0 && (
+        {teams.length > 0 && (display === 'gallery' ? (
+          <TeamGallery key={resultKey} teams={teams} pageNumber={pageNumber} />
+        ) : (
           <ul className="board-list" aria-busy={board.loading}>
             {teams.map((team, index) => <TeamRow key={team.id} team={team} position={(pageNumber - 1) * 12 + index + 1} />)}
           </ul>
-        )}
+        ))}
 
         {(pageNumber > 1 || nextCursor) && (
           <nav className="row pager" aria-label="Board pages">

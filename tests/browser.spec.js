@@ -51,6 +51,8 @@ test('two signed-in browsers request and approve the final seat without refreshi
     await expect(applicant.getByRole('link', { name: 'My team' })).toBeVisible();
     await applicant.getByRole('link', { name: 'Board', exact: true }).click();
     await expect(applicant.getByRole('heading', { name: 'Open teams, page 1' })).toBeVisible();
+    await applicant.getByRole('button', { name: 'List', exact: true }).click();
+    await expect(applicant.getByRole('link', { name: 'Rubber Duck Debuggers' })).toBeVisible();
     await expect(applicant.getByRole('link', { name: 'Keyboard Kernel' })).toHaveCount(0);
     expect(failures).toEqual([]);
   } finally {
@@ -60,30 +62,36 @@ test('two signed-in browsers request and approve the final seat without refreshi
 
 test('board renders placeholders during a slow response, supports filters, and respects reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await signup(page, 'Load State Reader');
   let release;
+  let boardRequests = 0;
   const delay = new Promise(resolve => { release = resolve; });
   await page.route('**/api/board*', async route => {
+    boardRequests++;
     await delay;
     await route.continue();
   });
+  await signup(page, 'Load State Reader');
+  await expect(page.locator('.crew-welcome-word')).toHaveText('Welcome');
+  await expect.poll(() => boardRequests).toBe(1);
   await page.getByRole('link', { name: 'Board', exact: true }).click();
-  const skeleton = page.locator('.loading-board .skeleton-line').first();
+  const skeleton = page.locator('.crew-gallery-loading .crew-placeholder').first();
   await expect(skeleton).toBeVisible();
   await expect(skeleton).toHaveCSS('animation-name', 'none');
   release();
   await expect(page.getByRole('link', { name: 'Rubber Duck Debuggers' })).toBeVisible();
+  expect(boardRequests).toBe(1);
   const search = page.getByLabel('Search teams');
   await search.fill('Rubber Duck');
-  await expect(page.locator('.board-row')).toHaveCount(1);
+  await expect(page.locator('.crew-cover')).toHaveCount(1);
   await expect(search).toBeFocused();
+  await expect(page.locator('.tab-blinds')).toHaveCount(0);
 });
 
 test('phone layout fits and keyboard can navigate from the board to a team', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 812 });
   await signup(page, 'Pocket Debugger');
   await page.getByRole('link', { name: 'Board', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Board', exact: true })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Find a team', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Search teams')).toBeFocused();
   const link = page.getByRole('link', { name: 'Rubber Duck Debuggers' });
@@ -130,6 +138,9 @@ test('an invite link waits for confirmation and claims its preapproved seat once
   await page.getByRole('button', { name: 'Create invite code' }).click();
   const link = page.getByLabel('Link', { exact: true });
   await expect(link).toHaveValue(/#\/join\?code=/);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Copy link' }).click();
+  await expect(page.getByRole('button', { name: '✓ Copied' })).toBeVisible();
   const inviteUrl = await link.inputValue();
   const context = await browser.newContext({ baseURL });
   try {
@@ -145,4 +156,24 @@ test('an invite link waits for confirmation and claims its preapproved seat once
   } finally {
     await context.close();
   }
+});
+
+test('gallery shows live seat counts and supports arrows, swipe, and list view', async ({ page }) => {
+  await signup(page, 'Gallery Reader');
+  await page.getByRole('link', { name: 'Board', exact: true }).click();
+  const gallery = page.getByRole('region', { name: 'Team gallery' });
+  await expect(gallery.getByRole('heading', { name: 'Rubber Duck Debuggers' })).toBeVisible();
+  await expect(gallery.locator('[data-slot="0"]')).toContainText('2 open seats');
+  const next = gallery.getByRole('button', { name: 'Next team' });
+  await next.click();
+  await expect(gallery.getByRole('heading', { name: 'Stack Underflow' })).toBeVisible();
+  await next.press('ArrowLeft');
+  await expect(gallery.getByRole('heading', { name: 'Rubber Duck Debuggers' })).toBeVisible();
+  const stage = gallery.locator('.crew-stage');
+  await stage.dispatchEvent('pointerdown', { pointerType: 'touch', pointerId: 1, clientX: 180, clientY: 90 });
+  await stage.dispatchEvent('pointerup', { pointerType: 'touch', pointerId: 1, clientX: 105, clientY: 92 });
+  await expect(gallery.getByRole('heading', { name: 'Stack Underflow' })).toBeVisible();
+  await page.getByRole('button', { name: 'List', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Rubber Duck Debuggers' })).toBeVisible();
+  await expect(page.locator('.board-row').first()).toContainText('2 open seats');
 });

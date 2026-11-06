@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import * as api from '../api.js';
 import { plural } from '../format.js';
 import { useApp, useResource } from '../hooks.js';
@@ -76,11 +76,37 @@ function FindCrewPanel() {
   );
 }
 
-export function OverviewPage() {
+function Welcome({ name }) {
+  const word = 'Welcome';
+  const [text, setText] = useState(word);
+  const first = name.trim().split(/\s+/)[0];
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    const symbols = ['#', '+', '·', '◇', '/', '='];
+    let frame = 0;
+    const reveal = () => {
+      setText([...word].map((letter, index) => index < frame ? letter : symbols[(index * 3 + frame) % symbols.length]).join(''));
+      frame += 1;
+      if (frame > word.length) clearInterval(timer);
+    };
+    const timer = setInterval(reveal, 52);
+    reveal();
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <p className="crew-welcome" role="status">
+      <span className="visually-hidden">Welcome, {first}.</span>
+      <span aria-hidden="true"><span className="crew-welcome-word">{text}</span>, {first}.</span>
+    </p>
+  );
+}
+
+export function OverviewPage({ showWelcome }) {
   const { user, teamId } = useApp();
   const people = useSuggestions();
   return (
-    <Page title="Overview" eyebrow="Your workspace / home">
+    <Page title="Overview">
+      {showWelcome && <Welcome name={user.name} />}
       <div className="overview">
         <div className="overview-main">
           {teamId ? <MyTeamPanel /> : <FindCrewPanel />}

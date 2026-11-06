@@ -28,13 +28,26 @@ function focusMain(event) {
   document.querySelector('main h1')?.focus();
 }
 
-function Signedin({ user, teamId, setSession, refreshSession, endSession }) {
+function Signedin({ user, teamId, setSession, refreshSession, endSession, showWelcome }) {
   const route = useHashRoute();
   const { tick, connection } = useLiveTick(true);
   const [notice, setNotice] = useState('');
+  const [tabReveal, setTabReveal] = useState(null);
+  const [welcomePath, setWelcomePath] = useState(showWelcome ? route.path : null);
   const signOut = useAction();
   const main = useRef(null);
   useFocusRescue(main);
+
+  useEffect(() => {
+    if (window.location.hash === '' || window.location.hash === '#/') {
+      api.prefetchBoard();
+    }
+    return api.clearBoardPrefetch;
+  }, []);
+
+  useEffect(() => {
+    if (welcomePath && welcomePath !== route.path) setWelcomePath(null);
+  }, [route.path, welcomePath]);
 
   const announce = useCallback(message => setNotice(message), []);
   useEffect(() => {
@@ -49,6 +62,8 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession }) {
   const lastTick = useRef(tick);
   useEffect(() => {
     if (tick === lastTick.current) return;
+    // A committed live change invalidates the background board snapshot.
+    if (lastTick.current > 0) api.clearBoardPrefetch();
     lastTick.current = tick;
     api.getMe().then(me => {
       if (!me.user) {
@@ -98,7 +113,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession }) {
   ];
 
   let page;
-  if (route.path === '/') page = <OverviewPage />;
+  if (route.path === '/') page = <OverviewPage showWelcome={welcomePath === route.path} />;
   else if (route.path === '/board') page = <BoardPage initial={route.params} />;
   else if (route.path === '/people') page = <PeoplePage />;
   else if (route.path === '/new') page = <CreateTeamPage />;
@@ -117,7 +132,12 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession }) {
             <ul>
               {links.map(([path, label]) => (
                 <li key={path}>
-                  <a href={`#${path}`} aria-current={route.path === path ? 'page' : undefined}>{label}</a>
+                  <a href={`#${path}`} aria-current={route.path === path ? 'page' : undefined} onClick={event => {
+                    if (path !== route.path && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+                      && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                      setTabReveal(path);
+                    }
+                  }}>{label}</a>
                 </li>
               ))}
             </ul>
@@ -133,7 +153,16 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession }) {
             <p className="rail-stamp">May contain traces of recursion.</p>
           </div>
         </header>
-        <main ref={main} id="main"><React.Fragment key={route.path}>{page}</React.Fragment></main>
+        <main ref={main} id="main" className={route.path === '/board' ? 'board-view' : undefined}>
+          <React.Fragment key={route.path}>
+            {page}
+            {tabReveal === route.path && (
+              <div className="tab-blinds" aria-hidden="true" onAnimationEnd={event => {
+                if (event.target === event.currentTarget.lastElementChild) setTabReveal(null);
+              }}><span /><span /><span /><span /><span /></div>
+            )}
+          </React.Fragment>
+        </main>
       </div>
       <p className="toast" role="status">{notice}</p>
     </AppContext.Provider>
@@ -143,6 +172,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession }) {
 export function App() {
   const [session, setSession] = useState({ status: 'loading', user: null, teamId: null, error: null });
   const [endedNotice, setEndedNotice] = useState('');
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const refreshSession = useCallback(async () => {
     const me = await api.getMe();
@@ -173,6 +203,7 @@ export function App() {
 
   const signedIn = useCallback(me => {
     setEndedNotice('');
+    setShowWelcome(true);
     setSession({ status: 'ready', user: me.user, teamId: me.teamId, error: null });
   }, []);
 
@@ -196,6 +227,7 @@ export function App() {
       setSession={setSession}
       refreshSession={refreshSession}
       endSession={endSession}
+      showWelcome={showWelcome}
     />
   );
 }

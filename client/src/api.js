@@ -92,12 +92,37 @@ export const login = body => write('/api/auth/login', body, { auth: true });
 export const register = body => write('/api/auth/register', body, { auth: true });
 export const logout = () => write('/api/auth/logout', {}, { auth: true });
 
+let boardPrefetch;
+
+export function clearBoardPrefetch() {
+  boardPrefetch?.controller.abort();
+  boardPrefetch = undefined;
+}
+
+export function prefetchBoard() {
+  clearBoardPrefetch();
+  const controller = new AbortController();
+  const result = send('/api/board', { headers: { Accept: 'application/json' }, priority: 'low' }, controller.signal)
+    .catch(() => null);
+  boardPrefetch = { controller, result, expires: performance.now() + 5000 };
+}
+
 export function getBoard({ q, skill, cursor }, signal) {
   const query = new URLSearchParams();
   if (q) query.set('q', q);
   if (skill) query.set('skill', skill);
   if (cursor) query.set('cursor', cursor);
   const text = query.toString();
+  if (!text && boardPrefetch) {
+    const { result, expires } = boardPrefetch;
+    if (performance.now() < expires) {
+      return result.then(data => {
+        signal?.throwIfAborted();
+        return data ?? read('/api/board', signal);
+      });
+    }
+    clearBoardPrefetch();
+  }
   return read(text ? `/api/board?${text}` : '/api/board', signal);
 }
 
