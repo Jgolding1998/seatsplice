@@ -104,6 +104,26 @@ test('phone layout fits and keyboard can navigate from the board to a team', asy
   expect(content).toBeLessThanOrEqual(viewport);
 });
 
+test('compact navigation preserves desktop keyboard access and frees space on phones', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signup(page, 'Compact Navigator');
+  const collapse = page.getByRole('button', { name: 'Collapse navigation' });
+  const expand = page.getByRole('button', { name: 'Expand navigation' });
+  const board = page.getByRole('link', { name: 'Board', exact: true });
+  await collapse.focus();
+  await page.keyboard.press('Enter');
+  await expect(expand).toBeFocused();
+  await expect(board).toBeVisible();
+  await board.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Find a team' })).toBeVisible();
+  await page.setViewportSize({ width: 360, height: 800 });
+  await expect(board).toBeHidden();
+  await expand.click();
+  await expect(board).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
+});
+
 test('automated accessibility checks pass on sign-in, board and team screens', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();

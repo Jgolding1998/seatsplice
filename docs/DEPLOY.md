@@ -1,0 +1,10 @@
+# Free demo deployment
+
+1. In [MongoDB Atlas](https://cloud.mongodb.com/), create a **Free (M0)** cluster. Prefer a region close to your Render region. In Database Access, create a dedicated database user with the `readWrite` role scoped to the `seatsplice` database. Give it a strong generated password. Under **Connect → Drivers**, copy the Node.js connection string and replace the password placeholder. Keep this URL private.
+2. In [Render](https://dashboard.render.com/), choose **New → Blueprint** and connect the Seatsplice GitHub repository. Grant repository access to this repo only if Render offers that choice. The blueprint selects the **Free** web service plan. Paste the Atlas connection string into the `MONGO_URL` field. Render generates `INVITE_SECRET` automatically. Apply the blueprint.
+3. Open the resulting Render service. Under **Connect → Outbound**, copy its CIDR ranges and add them to Atlas under **Network Access → IP Access List**. If the first Render build could not connect, use **Manual Deploy → Deploy latest commit** after Atlas shows the entries as active. Keep access scoped to the Render ranges.
+4. Open the service URL and `/api/health` (expect `{"ok":true}`). Register two fictional accounts in separate browser profiles, create a two-seat team, and test the request and approval flow. Check both profiles update without a manual refresh. In browser developer tools, confirm the session cookie is Secure, HttpOnly and SameSite Strict. On the host, verify the expected proxy hop count and that the event stream is not buffered.
+
+Render may put a free service to sleep after inactivity. Allow for a cold start during review. The load test report describes the local 10,000-person fixture; use it to reproduce the benchmark without sending a burst of test traffic to a shared free service.
+
+References: [Atlas free clusters](https://www.mongodb.com/docs/atlas/tutorial/deploy-free-tier-cluster/), [Atlas database connection](https://www.mongodb.com/docs/atlas/connect-to-database-deployment/), [Render Blueprints](https://render.com/docs/infrastructure-as-code), [Render outbound IPs](https://render.com/docs/outbound-ip-addresses).

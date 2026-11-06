@@ -16,7 +16,7 @@ export function Page({ title, intro, eyebrow, children }) {
     window.scrollTo(0, 0);
     heading.current?.focus({ preventScroll: true });
   }, []);
-  useEffect(() => { document.title = `${title} · Crewboard`; }, [title]);
+  useEffect(() => { document.title = `${title} · Seatsplice`; }, [title]);
   return (
     <>
       <div className="page-head">
@@ -30,12 +30,12 @@ export function Page({ title, intro, eyebrow, children }) {
 }
 
 // Stays focusable while busy: disabling a focused button would drop keyboard focus to <body>.
-export function Button({ variant = 'quiet', busy = false, busyLabel, onClick, type = 'button', children, ...rest }) {
+export function Button({ variant = 'quiet', busy = false, busyLabel, onClick, type = 'button', className = '', children, ...rest }) {
   return (
     <button
       {...rest}
       type={type}
-      className={`button button-${variant}`}
+      className={`button button-${variant} ${className}`.trim()}
       aria-disabled={busy || undefined}
       onClick={event => {
         if (busy) {

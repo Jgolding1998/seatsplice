@@ -1,4 +1,4 @@
-// Single gateway to the Crewboard API. Same origin only; the session is an httpOnly cookie.
+// Single gateway to the Seatsplice API. Same origin only; the session is an httpOnly cookie.
 
 const TIMEOUT_MS = 15000;
 
@@ -42,7 +42,7 @@ async function send(path, init, signal) {
     });
   } catch (cause) {
     if (signal?.aborted) throw cause;
-    throw new ApiError(0, 'NETWORK', 'Crewboard could not be reached. Check your connection and try again.');
+    throw new ApiError(0, 'NETWORK', 'Seatsplice could not be reached. Check your connection and try again.');
   }
   if (response.status === 204) return null;
 

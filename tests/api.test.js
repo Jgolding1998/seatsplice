@@ -92,6 +92,25 @@ test('invalid logins do not identify registered accounts', async () => {
   assert.deepEqual(existing.body, missing.body);
 });
 
+test('SQL and MongoDB injection payloads cannot authenticate or mint a session', async () => {
+  await http().post('/api/auth/register').send(credentials).expect(201);
+  const originalCount = await db.sessions.countDocuments();
+  const payloads = [
+    [400, { email: "x' OR 1=1 --", password: credentials.password }],
+    [401, { email: credentials.email, password: "' OR '1'='1' --" }],
+    [400, { email: { $ne: null }, password: credentials.password }],
+    [400, { email: credentials.email, password: { $ne: null } }],
+    [400, { email: credentials.email, password: ['anything'] }],
+    [400, { email: credentials.email, password: credentials.password, $where: 'true' }]
+  ];
+  for (const [status, body] of payloads) {
+    const denied = await http().post('/api/auth/login').send(body).expect(status);
+    assert.equal(denied.headers['set-cookie'], undefined);
+  }
+  assert.equal(await db.sessions.countDocuments(), originalCount);
+  await get('/board').expect(401);
+});
+
 test('logged-out session cannot read private endpoints', async () => {
   const user = await person();
   await post('/auth/logout', user).expect(204);

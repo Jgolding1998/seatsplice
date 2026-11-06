@@ -1,4 +1,4 @@
-name: Crewboard checks
+name: Seatsplice checks
 on: [push, pull_request]
 permissions:
   contents: read

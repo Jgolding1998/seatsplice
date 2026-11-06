@@ -115,30 +115,12 @@ h2 { letter-spacing: -.02em; }
 .board-index { font: 650 11px/1 var(--mono); color: var(--ink-3); letter-spacing: .09em; }
 .board-index::before { content: '#'; opacity: .8; }
 
-.auth-story {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background-image:
-    repeating-linear-gradient(0deg, #ffffff09 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(90deg, #ffffff09 0 1px, transparent 1px 44px);
-  background-color: #181820;
-  --accent-ink: #f4d46b;
-  --ink-3: #cbc8d3;
-}
+.auth-story { position: relative; isolation: isolate; overflow: hidden; }
 .auth-story > * { position: relative; }
 .auth-story .brand { align-self: start; }
-.auth-line {
-  font-size: clamp(34px, 5.3vw, 78px);
-  line-height: .96;
-  font-weight: 790;
-  letter-spacing: -.085em;
-  max-width: 13ch;
-}
+.auth-line { font-weight: 790; }
 .auth-story .muted { max-width: 43ch; font-size: 15px; }
-.auth-form { padding-top: 32px; }
 .auth-form .page-head { border: 0; padding: 0; }
-.welcome-print { display: none; }
 .invite .button { min-width: 102px; }
 .invite .button[data-copied="true"] { background: var(--accent-wash); color: var(--accent-ink); }
 .crew-welcome {
@@ -204,21 +186,6 @@ h2 { letter-spacing: -.02em; }
   .rail-stamp { display: block; margin-top: 7px; color: var(--rail-muted); font: 500 11px/1.4 var(--mono); }
   .shell main { padding: 38px clamp(32px, 4vw, 64px) 80px; }
   .auth { grid-template-columns: minmax(0, 1.16fr) minmax(0, 1fr); }
-  .auth-story { padding: clamp(42px, 6vw, 100px); gap: 22px; }
-  .welcome-print {
-    display: grid;
-    gap: 3px;
-    width: 176px;
-    padding: 9px 12px 12px;
-    background: #f0c568;
-    color: #27242a;
-    border: 1px solid #f8e0aa;
-    border-radius: 4px;
-    box-shadow: 7px 7px 0 #6d5176, 14px 14px 0 #343047;
-    transform: rotate(-5deg);
-  }
-  .welcome-print > span { font: 650 8px/1.4 var(--mono); }
-  .welcome-print strong { font: 800 14px/1 var(--mono); }
 }
 @media (min-width: 1000px) {
   .board-row, .loading-board .loading-row {

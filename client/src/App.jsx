@@ -14,11 +14,21 @@ import { TeamPage } from './pages/Team.jsx';
 
 const TEAM_ROUTE = /^\/teams\/([A-Za-z0-9-]{1,64})$/;
 const CONNECTION_TEXT = { connecting: 'Connecting', live: 'Live', reconnecting: 'Reconnecting' };
+const NAV_ICONS = {
+  Overview: 'M3 10l9-7 9 7v11h-6v-7H9v7H3z',
+  Board: 'M3 4h18v16H3zM9 4v16m6-16v16',
+  'My team': 'M3 6h18v13H3zM3 10h18m-12 3v3m6-3v3',
+  People: 'M8 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-7a3 3 0 0 1 0 6M2 21v-1a6 6 0 0 1 12 0v1m2-6a5 5 0 0 1 6 5v1'
+};
+
+function RailIcon({ path }) {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
+}
 
 function NotFound() {
   return (
     <Page title="Page not found">
-      <p>This address does not match anything in Crewboard.</p>
+      <p>This address does not match anything in Seatsplice.</p>
       <p><a href="#/">Go to overview</a></p>
     </Page>
   );
@@ -33,6 +43,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   const { tick, connection } = useLiveTick(true, api.clearBoardPrefetch);
   const [notice, setNotice] = useState('');
   const [tabReveal, setTabReveal] = useState(null);
+  const [compact, setCompact] = useState(false);
   const [welcomePath, setWelcomePath] = useState(showWelcome ? route.path : null);
   const signOut = useAction();
   const main = useRef(null);
@@ -122,20 +133,25 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   return (
     <AppContext.Provider value={context}>
       <a className="skip-link" href="#main" onClick={focusMain}>Skip to content</a>
-      <div className="shell">
+      <div className={compact ? 'shell rail-compact' : 'shell'}>
         <header className="rail">
-          <a className="brand" href="#/"><span className="brand-mark" aria-hidden="true" />Crewboard</a>
-          <nav aria-label="Main">
+          <div className="rail-top">
+            <a className="brand" href="#/" title="Seatsplice"><span className="brand-mark" aria-hidden="true" /><span className="rail-text">Seatsplice</span></a>
+            <Button className="rail-toggle" aria-label={compact ? 'Expand navigation' : 'Collapse navigation'} aria-controls="main-navigation" aria-expanded={!compact} title={compact ? 'Expand navigation' : 'Collapse navigation'} onClick={() => setCompact(value => !value)}>
+              <RailIcon path={compact ? 'M3 4h18v16H3zM8 4v16m4-11 3 3-3 3' : 'M3 4h18v16H3zM8 4v16m7-11-3 3 3 3'} />
+            </Button>
+          </div>
+          <nav id="main-navigation" aria-label="Main">
             <p className="rail-label" aria-hidden="true">Workspace / 01</p>
             <ul>
               {links.map(([path, label]) => (
                 <li key={path}>
-                  <a href={`#${path}`} aria-current={route.path === path ? 'page' : undefined} onClick={event => {
+                  <a href={`#${path}`} title={label} aria-current={route.path === path ? 'page' : undefined} onClick={event => {
                     if (path !== route.path && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
                       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                       setTabReveal(path);
                     }
-                  }}>{label}</a>
+                  }}><RailIcon path={NAV_ICONS[label.startsWith('My team') ? 'My team' : label]} /><span className="rail-text">{label}</span></a>
                 </li>
               ))}
             </ul>
@@ -205,11 +221,11 @@ export function App() {
     setSession({ status: 'ready', user: me.user, teamId: me.teamId, error: null });
   }, []);
 
-  if (session.status === 'loading') return <main className="center"><Loading label="Loading Crewboard" kind="session" /></main>;
+  if (session.status === 'loading') return <main className="center"><Loading label="Loading Seatsplice" kind="session" /></main>;
   if (session.status === 'error') {
     return (
       <main className="center">
-        <h1>Crewboard</h1>
+        <h1>Seatsplice</h1>
         <LoadError error={session.error} onRetry={start} />
       </main>
     );

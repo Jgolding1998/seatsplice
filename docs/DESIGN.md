@@ -1,6 +1,6 @@
-# Crewboard design
+# Seatsplice design
 
-Crewboard uses a React client, an Express API, and a MongoDB replica set. One instance of the app serves one event. Profiles contain public names, skills, and time zones. Email and session records stay private. The board lists open teams in stable key order with cursor pagination and indexed skill filters.
+Seatsplice uses a React client, an Express API, and a MongoDB replica set. One instance of the app serves one event. Profiles contain public names, skills, and time zones. Email and session records stay private. The board lists open teams in stable key order with cursor pagination and indexed skill filters.
 
 **Seat integrity.** Each seat claim checks capacity, updates the team by version, inserts the membership, closes any pending request, and writes the audit event in one transaction. Competing claims write the same team document, so a conflict retries with a fresh snapshot. A unique index on event and participant prevents enrollment by different teams. Tests race 50 leader approvals and 50 separate invite holders across two app instances. Each race produces one new membership and one audit entry.
 

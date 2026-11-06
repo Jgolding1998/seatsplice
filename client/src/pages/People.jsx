@@ -37,7 +37,7 @@ export function PeoplePage() {
         : 'People without a team, ranked by the skills you lack and how close their time zone is to yours'}
     >
       <p className="muted">
-        Contact details stay private, so Crewboard does not message anyone for you.{' '}
+        Contact details stay private, so Seatsplice does not message anyone for you.{' '}
         {teamId ? <>Leaders can share an invite code from <a href={`#/teams/${teamId}`}>their team</a> wherever the event chats.</> : 'Meet in the event chat, then exchange an invite code.'}
       </p>
       {people.error && <LoadError error={people.error} onRetry={people.retry} />}

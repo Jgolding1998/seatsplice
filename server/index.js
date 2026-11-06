@@ -13,17 +13,24 @@ if (secure && !origin.startsWith('https://')) throw new Error('Production requir
 if (!/^\d$/.test(trustProxy) || (secure && process.env.TRUST_PROXY === undefined)) {
   throw new Error('Set TRUST_PROXY to the number of trusted proxy hops.');
 }
-if ((secure || INVITE_SECRET !== undefined) && !/^[a-f0-9]{64}$/i.test(INVITE_SECRET ?? '')) {
-  throw new Error('Set INVITE_SECRET to 32 random bytes as hex.');
+const inviteSecret = INVITE_SECRET
+  ? /^[a-f0-9]{64}$/i.test(INVITE_SECRET)
+    ? Buffer.from(INVITE_SECRET, 'hex')
+    : Buffer.from(INVITE_SECRET, 'base64')
+  : undefined;
+if ((secure || INVITE_SECRET !== undefined) &&
+  (inviteSecret?.length !== 32 ||
+    (!/^[a-f0-9]{64}$/i.test(INVITE_SECRET) && inviteSecret.toString('base64') !== INVITE_SECRET))) {
+  throw new Error('Set INVITE_SECRET to 32 random bytes encoded as hex or standard base64.');
 }
 const db = await connect(MONGO_URL, MONGO_DATABASE);
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 const { app, events } = createApp(db, {
-  origin, secure, trustProxy: Number(trustProxy), inviteSecret: INVITE_SECRET ? Buffer.from(INVITE_SECRET, 'hex') : undefined,
+  origin, secure, trustProxy: Number(trustProxy), inviteSecret,
   staticDir: existsSync(dist) ? dist : undefined
 });
 const host = process.env.HOST ?? (secure ? '0.0.0.0' : '127.0.0.1');
-const server = app.listen(port, host, () => console.log(`Crewboard listening on ${host}:${port}`));
+const server = app.listen(port, host, () => console.log(`Seatsplice listening on ${host}:${port}`));
 server.requestTimeout = 15000;
 server.headersTimeout = 10000;
 

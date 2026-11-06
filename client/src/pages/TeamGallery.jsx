@@ -81,7 +81,7 @@ function Cover({ team, position }) {
   return (
     <>
       <span className="crew-print" data-theme={cover.theme}>
-        <span className="crew-print-number">CB—{String(position).padStart(2, '0')}</span>
+        <span className="crew-print-number">SP—{String(position).padStart(2, '0')}</span>
         <CoverArt index={index} />
         <span className="crew-print-label" aria-hidden="true">{cover.label}</span>
       </span>

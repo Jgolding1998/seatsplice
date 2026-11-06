@@ -15,7 +15,7 @@ const dist = fileURLToPath(new URL('../dist', import.meta.url));
 const { app, events } = createApp(db, { origin: `http://${host}:${port}`, staticDir: dist });
 const server = app.listen(port, host);
 await once(server, 'listening');
-console.log(`Crewboard preview: http://${host}:${port}`);
+console.log(`Seatsplice preview: http://${host}:${port}`);
 
 let stopped = false;
 async function shutdown() {

@@ -1,6 +1,10 @@
-# Crewboard
+# Seatsplice
 
-Crewboard is a team formation service for a single hackathon. Participants can discover open teams, request a seat, or share an expiring invitation. Team leaders approve applicants and manage membership. The board reflects committed changes without a reload.
+**Find your people.** Seatsplice is a live team finder for [Hack4Hack’s PS1 challenge](https://hack4hack.com/hackathons/hack4hack-crew-hiring-challenge-2026-tp3m). Discover open seats, ask to join, or start a team. The board updates when a seat is taken.
+
+![Seatsplice team gallery showing illustrated team cards and live seat counts](docs/board.webp)
+
+The hard part is the last seat. In two automated races, 50 approvals and 50 separate invite holders each competed for one opening across two app instances. Exactly one claim succeeded in each race. The [local load report](docs/LOAD-TEST.md) covers 100 concurrent participants against a database seeded with 10,000 users and 2,000 teams.
 
 ## Run it
 
@@ -32,7 +36,9 @@ The API tests use a temporary MongoDB replica set and two HTTP app instances. Th
 
 The production build serves React and the Express API on one origin. Use a MongoDB replica set or MongoDB Atlas with a dedicated application database user. Keep `MONGO_URL` and `INVITE_SECRET` in your host's secret settings. Generate the latter with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Keep the same invite secret across instances and restarts.
 
-The [Render blueprint](render.yaml) supplies the build and start commands, HTTP health check, and environment configuration. For another host, set `NODE_ENV=production`, `APP_ORIGIN` to the public HTTPS origin, and `TRUST_PROXY` to the exact trusted proxy hop count. Set the database and invite secrets, build with `npm ci --include=dev && npm run build`, then start with `npm start`. Verify that the host forwards the real client IP and streams `/api/events` without buffering it. For a public demo, provision disposable review accounts or let reviewers register and use two browser profiles.
+The [Render blueprint](render.yaml) supplies the build and start commands, HTTP health check, and environment configuration. It generates the invite secret on Render. Follow the [free deployment guide](docs/DEPLOY.md) to connect the database and verify the public demo.
+
+For another host, set `NODE_ENV=production`, `APP_ORIGIN` to the public HTTPS origin, and `TRUST_PROXY` to the exact trusted proxy hop count. Set the database and invite secrets, build with `npm ci --include=dev && npm run build`, then start with `npm start`.
 
 ## Submission notes
 

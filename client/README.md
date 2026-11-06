@@ -1,4 +1,4 @@
-# Crewboard client
+# Seatsplice client
 
 React and ReactDOM only. Vite uses this folder as its root, and all API calls go to `/api` on the same origin.
 

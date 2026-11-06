@@ -3,7 +3,7 @@ import * as api from '../api.js';
 import { LIMITS, browserTimezone } from '../format.js';
 import { useAction } from '../hooks.js';
 import { Button, Field, FormError, Page, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
-import { CoverArt } from './TeamGallery.jsx';
+import { SignalArt } from './SignalArt.jsx';
 
 const looksLikeEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -21,7 +21,7 @@ function PasswordField({ value, onChange, error, hint, autoComplete }) {
             autoComplete={autoComplete}
             onChange={event => onChange(event.target.value)}
           />
-          <Button aria-pressed={visible} onClick={() => setVisible(!visible)}>Show</Button>
+          <Button aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? 'Hide' : 'Show'}</Button>
         </div>
       )}
     </Field>
@@ -55,7 +55,7 @@ function LoginForm({ onSignedIn, refreshSession, onSwitch }) {
     <form ref={form} onSubmit={submit} noValidate>
       <FormError error={action.error} />
       <Field label="Email" error={errors.email}>
-        {field => <input {...field} type="email" value={email} autoComplete="email" onChange={event => setEmail(event.target.value)} />}
+        {field => <input {...field} type="email" value={email} autoComplete="username" onChange={event => setEmail(event.target.value)} />}
       </Field>
       <PasswordField value={password} onChange={setPassword} error={errors.password} autoComplete="current-password" />
       <div className="row">
@@ -164,18 +164,18 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
   const Form = mode === 'login' ? LoginForm : SignupForm;
   return (
     <main className="auth">
-      <section className="auth-story" aria-label="About Crewboard">
-        <p className="brand"><span className="brand-mark" aria-hidden="true" />Crewboard</p>
-        <p className="auth-line">Find your hackathon team.</p>
-        <p className="muted">Browse open teams, request a seat, or join with an invite code.</p>
-        <div className="welcome-print" aria-hidden="true">
-          <span>CREWBOARD / FIELD RECORD 01</span>
-          <CoverArt index={0} />
-          <strong>RUBBER DUCK<br />DEBUGGING CLUB</strong>
+      <section className="auth-story" aria-label="About Seatsplice">
+        <p className="brand"><span className="brand-mark" aria-hidden="true" />Seatsplice</p>
+        <SignalArt />
+        <div className="signal-copy">
+          <p className="eyebrow">The hackathon team finder</p>
+          <p className="auth-line">Find your people.</p>
+          <p className="muted">Find an open seat, start a team, or join with an invite code.</p>
         </div>
+        <p className="signal-footer" aria-hidden="true"><span>01 / TEAM FORMATION</span><span>Bring your own rubber duck.</span></p>
       </section>
       <section className="auth-form">
-        <Page key={mode} title={title}>
+        <Page key={mode} title={title} intro={mode === 'login' ? 'Use your email to get back to the team board.' : 'Tell teams what you can help build.'}>
           {notice && <p className="alert" role="status">{notice}</p>}
           <Form onSignedIn={onSignedIn} refreshSession={refreshSession} onSwitch={() => setMode(mode === 'login' ? 'signup' : 'login')} />
         </Page>
