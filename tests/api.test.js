@@ -416,6 +416,45 @@ test('removing a member reopens a full team on the board', async () => {
   assert.equal((await get('/me', member)).body.teamId, null);
 });
 
+test('a new board reader does not inherit a snapshot held open across the last-seat commit', { timeout: 8000 }, async () => {
+  const leader = await person();
+  const applicant = await person('Last seat applicant');
+  const id = await team(leader, { maxSize: 2 });
+  const application = await join(id, applicant);
+  const find = db.teams.find;
+  let intercepted = false;
+  let snapshotReady;
+  let release;
+  const started = new Promise(resolve => { snapshotReady = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  db.teams.find = function (filter, ...options) {
+    const cursor = find.call(this, filter, ...options);
+    if (!intercepted && filter.open === true) {
+      intercepted = true;
+      const read = cursor.toArray.bind(cursor);
+      cursor.toArray = async () => {
+        const rows = await read();
+        snapshotReady();
+        await gate;
+        return rows;
+      };
+    }
+    return cursor;
+  };
+  const oldResponse = get('/board', leader).expect(200).then(response => response);
+  try {
+    await Promise.race([started, oldResponse.then(() => assert.fail('Board query was not intercepted'))]);
+    await get('/board').expect(401);
+    await post(decision(id, application), leader).expect(200);
+    const latest = await get('/board', applicant).timeout({ deadline: 3000 }).expect(200);
+    assert.equal(latest.body.teams.length, 0);
+  } finally {
+    release();
+    delete db.teams.find;
+    assert.equal((await oldResponse).body.teams[0].id, id);
+  }
+});
+
 test('board handles literal search and case-insensitive skill filters', async () => {
   const leader = await person();
   const id = await team(leader, { name: 'C++ team' });
