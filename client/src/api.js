@@ -77,6 +77,7 @@ async function write(path, body = {}, { auth = false } = {}) {
       body: JSON.stringify(body)
     });
     if (intent) unresolvedKeys.delete(intent);
+    if (!auth) clearBoardPrefetch();
     return result;
   } catch (error) {
     if (intent && error.status > 0 && error.status < 500) unresolvedKeys.delete(intent);

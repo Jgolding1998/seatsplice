@@ -155,7 +155,6 @@ export function TeamGallery({ teams, pageNumber }) {
             event.stopPropagation();
           }
         }}>
-        <div className="crew-stage-label" aria-hidden="true">CREWBOARD <span>FIELD RECORDS</span></div>
         <div className="crew-watermark" aria-hidden="true">OPEN<br />SEATS</div>
         {teams.map((item, index) => {
           const relative = (index - active + count) % count;

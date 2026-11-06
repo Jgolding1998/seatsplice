@@ -7,7 +7,7 @@ const MAX_BACKOFF_MS = 30000;
 // Subscribes to /api/events and turns bursts of `change` events into one `tick`. Events carry no
 // data; pages refetch what they show. The stream closes in hidden tabs, so many open tabs do not
 // exhaust the browser's per-host connection limit, and it catches up when the tab returns.
-export function useLiveTick(enabled) {
+export function useLiveTick(enabled, invalidate) {
   const [tick, setTick] = useState(0);
   const [connection, setConnection] = useState('connecting');
 
@@ -18,8 +18,10 @@ export function useLiveTick(enabled) {
     let retryTimer = null;
     let failures = 0;
     let missedEvents = false;
+    let awaitingGreeting = true;
 
     const scheduleRefresh = () => {
+      invalidate();
       if (refreshTimer !== null) return;
       // Jitter spreads refetches, so one change does not hit the server from every client at once.
       refreshTimer = setTimeout(() => {
@@ -39,12 +41,17 @@ export function useLiveTick(enabled) {
       if (source || document.hidden) return;
       source = new EventSource('/api/events');
       source.addEventListener('open', () => {
+        awaitingGreeting = true;
         failures = 0;
         setConnection('live');
         if (missedEvents) scheduleRefresh();
         missedEvents = false;
       });
-      source.addEventListener('change', scheduleRefresh);
+      source.addEventListener('change', () => {
+        // The server greets each new connection with one change frame before sending real changes.
+        if (awaitingGreeting) awaitingGreeting = false;
+        else scheduleRefresh();
+      });
       source.addEventListener('error', () => {
         missedEvents = true;
         setConnection('reconnecting');
@@ -74,7 +81,7 @@ export function useLiveTick(enabled) {
       clearTimeout(refreshTimer);
       close();
     };
-  }, [enabled]);
+  }, [enabled, invalidate]);
 
   return { tick, connection };
 }

@@ -30,7 +30,7 @@ function focusMain(event) {
 
 function Signedin({ user, teamId, setSession, refreshSession, endSession, showWelcome }) {
   const route = useHashRoute();
-  const { tick, connection } = useLiveTick(true);
+  const { tick, connection } = useLiveTick(true, api.clearBoardPrefetch);
   const [notice, setNotice] = useState('');
   const [tabReveal, setTabReveal] = useState(null);
   const [welcomePath, setWelcomePath] = useState(showWelcome ? route.path : null);
@@ -62,8 +62,6 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   const lastTick = useRef(tick);
   useEffect(() => {
     if (tick === lastTick.current) return;
-    // A committed live change invalidates the background board snapshot.
-    if (lastTick.current > 0) api.clearBoardPrefetch();
     lastTick.current = tick;
     api.getMe().then(me => {
       if (!me.user) {
