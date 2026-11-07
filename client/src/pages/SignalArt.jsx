@@ -13,7 +13,7 @@ const initialSin = Math.sin(initialYaw);
 const initialCos = Math.cos(initialYaw);
 const tiltSin = Math.sin(initialPitch);
 const tiltCos = Math.cos(initialPitch);
-const dot = { x: .8, y: .22, z: -Math.sqrt(1 - .8 ** 2 - .22 ** 2) };
+const dot = { x: -.27, y: -.42, z: -Math.sqrt(1 - .27 ** 2 - .42 ** 2) };
 const initialRotation = [0, 0, 0, 1];
 let cloud;
 
@@ -80,6 +80,10 @@ const dotPosition = [
   dot.y * tiltSin + dotDepth * tiltCos
 ];
 
+export function signalRadius(width, height, opening) {
+  return opening ? Math.min(height * .44, width * .95) : Math.min(width, height) * radiusScale;
+}
+
 export function SignalArt({ artRef, onOpenSignIn }) {
   const ref = useRef(null);
   const dotRef = useRef(null);
@@ -112,9 +116,9 @@ export function SignalArt({ artRef, onOpenSignIn }) {
     function paint() {
       if (!width || !height) return;
       ctx.clearRect(0, 0, width, height);
-      const diameter = Math.min(width, height);
-      const radius = diameter * radiusScale * zoom;
-      const pointScale = diameter / Math.max(1, Math.min(window.innerWidth, window.innerHeight));
+      const baseRadius = signalRadius(width, height, Boolean(dotRef.current));
+      const radius = baseRadius * zoom;
+      const pointScale = baseRadius / Math.max(1, signalRadius(window.innerWidth, window.innerHeight, true));
       const [a, b, c, d, e, f, g, h, i] = matrix(rotation);
       const compact = window.innerWidth < 600;
       for (const [x, y, z, grain] of points) {
@@ -136,14 +140,12 @@ export function SignalArt({ artRef, onOpenSignIn }) {
         const [x, y, z] = dotPosition;
         const horizontal = (a * x + b * y + c * z) * radius;
         const vertical = (d * x + e * y + f * z) * radius;
-        const facesViewer = g * x + h * y + i * z > .26;
-        const reachable = Math.abs(horizontal) < width / 2 - 24 && Math.abs(vertical) < height / 2 - 24;
-        const show = facesViewer && reachable;
-        const hide = !show && document.activeElement !== entry;
-        if (entry.hidden !== hide) entry.hidden = hide;
-        if (show) {
-          entry.style.transform = `translate(${horizontal}px, ${vertical}px)`;
-        }
+        const closeness = (1 + g * x + h * y + i * z) / 2;
+        entry.style.transform = `translate(${horizontal}px, ${vertical}px)`;
+        entry.style.setProperty('--entry-opacity', .50 + .50 * closeness);
+        entry.style.setProperty('--entry-scale', .55 + .45 * closeness);
+        entry.tabIndex = Math.abs(horizontal) < width / 2 - 12 && Math.abs(vertical) < height / 2 - 12 ? 0 : -1;
+        entry.hidden = false;
       }
     }
     function step(now) {
@@ -238,7 +240,7 @@ export function SignalArt({ artRef, onOpenSignIn }) {
       if (!suppressClick && Math.hypot(dx, dy) < 4) return;
       suppressClick = true;
       const elapsed = Math.max(8, event.timeStamp - drag.timeStamp);
-      const radiansPerPixel = 1 / Math.max(60, Math.min(width, height) * radiusScale * zoom);
+      const radiansPerPixel = 1 / Math.max(60, signalRadius(width, height, Boolean(dotRef.current)) * zoom);
       const rotationX = dx * radiansPerPixel;
       const rotationY = dy * radiansPerPixel;
       drag.x = event.clientX;

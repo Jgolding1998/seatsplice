@@ -3,7 +3,7 @@ import * as api from '../api.js';
 import { LIMITS, browserTimezone } from '../format.js';
 import { useAction } from '../hooks.js';
 import { Button, Field, FormError, Page, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
-import { SignalArt } from './SignalArt.jsx';
+import { SignalArt, signalRadius } from './SignalArt.jsx';
 
 const looksLikeEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -186,13 +186,15 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
     previousArt.current = null;
     if (!art || !before || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
     const after = art.getBoundingClientRect();
-    if (!before.width || !after.width) return undefined;
+    const fromRadius = signalRadius(before.width, before.height, true);
+    const toRadius = signalRadius(after.width, after.height, false);
+    if (!fromRadius || !toRadius) return undefined;
     const dx = before.left + before.width / 2 - after.left - after.width / 2;
     const dy = before.top + before.height / 2 - after.top - after.height / 2;
     const animation = art.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(${before.width / after.width})` },
+      { transform: `translate(${dx}px, ${dy}px) scale(${fromRadius / toRadius})` },
       { transform: 'none' }
-    ], { duration: 640, easing: 'cubic-bezier(.2, .75, .25, 1)' });
+    ], { duration: 720, easing: 'cubic-bezier(.35, 0, .2, 1)' });
     return () => animation.cancel();
   }, [opened]);
 
