@@ -188,7 +188,7 @@ export function TeamGallery({ teams, pageNumber, initialTeam, rememberTeam }) {
           <span className="crew-caption-index" aria-hidden="true">{String(position).padStart(2, '0')}</span>
           <div>
             <h3>{team.name}</h3>
-            <p>Led by {team.leaderName} · <Zone zone={team.timezone} /></p>
+            <p>{team.sample ? 'Sample team · ' : ''}Led by {team.leaderName} · <Zone zone={team.timezone} /></p>
           </div>
         </div>
         <div className="crew-gallery-actions">

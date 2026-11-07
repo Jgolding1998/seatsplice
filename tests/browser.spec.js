@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 async function signup(page, name, skill = 'React', inviteUrl) {
+  const email = `${randomUUID()}@example.test`;
   await page.goto(inviteUrl ?? '/');
   if (inviteUrl) await expect(page.getByText('You have a team invite')).toBeVisible();
   else {
@@ -10,14 +11,15 @@ async function signup(page, name, skill = 'React', inviteUrl) {
     await page.getByRole('button', { name: 'Create an account' }).click();
   }
   await page.getByLabel('Name', { exact: true }).fill(name);
-  await page.getByLabel('Email', { exact: true }).fill(`${randomUUID()}@example.test`);
+  await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill('fixture password for browser tests');
   await page.getByRole('button', { name: 'Continue' }).click();
   const skills = page.getByLabel('Your skills', { exact: true });
   await skills.fill(skill);
   await skills.press('Enter');
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
-  if (!inviteUrl) await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  if (!inviteUrl) await expect(page.getByRole('heading', { name: 'Find a team' })).toBeVisible();
+  return email;
 }
 
 async function makeTeam(page, name) {
@@ -167,13 +169,18 @@ test('sign-in sphere supports pinch zoom, swipe and tap on a phone', async ({ br
     await page.getByRole('button', { name: 'Open sign-in' }).tap();
     await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
     const smaller = await art.boundingBox();
-    expect(smaller.width).toBeLessThan(width);
+    expect(smaller.width).toBe(width);
+    expect(smaller.height).toBeLessThan(height);
     const panel = await page.locator('.auth-panel').boundingBox();
     expect(smaller.y + smaller.height / 2).toBeLessThan(panel.y);
     await expect.poll(() => sphereSpread(sphere)).toBeGreaterThan(0);
     const afterOpen = await sphereSpread(sphere);
-    await pinch({ x: Math.round(smaller.x + smaller.width / 2), y: Math.round(smaller.y + smaller.height / 2) }, 36, 50);
+    await pinch({ x: Math.round(smaller.x + smaller.width / 2), y: Math.round(smaller.y + smaller.height / 2) }, 36, 56);
     await expect.poll(() => sphereSpread(sphere)).toBeGreaterThan(afterOpen * 1.15);
+    await expect.poll(() => art.evaluate(canvas => {
+      const pixels = canvas.getContext('2d').getImageData(0, 0, Math.floor(canvas.width * .29), canvas.height).data;
+      return pixels.some((value, index) => index % 4 === 3 && value > 0);
+    })).toBe(true);
   } finally {
     await context.close();
   }
@@ -234,8 +241,9 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
       return { start, middle, end: canvas.getBoundingClientRect().width,
         panelStart, panelMiddle, panelEnd: panel.getBoundingClientRect().toJSON() };
     });
-    expect(positions.start.x + positions.start.width / 2).toBeCloseTo(before.x + before.width / 2, 0);
-    expect(positions.start.y + positions.start.height / 2).toBeCloseTo(before.y + before.height / 2, 0);
+    const mobile = viewport.width < 900;
+    expect(positions.start.x + positions.start.width * (mobile ? .655 : .56)).toBeCloseTo(before.x + before.width / 2, 0);
+    expect(positions.start.y + positions.start.height * (mobile ? .505 : .36)).toBeCloseTo(before.y + before.height / 2, 0);
     expect(positions.middle).toBeLessThan(positions.start.width);
     expect(positions.end).toBeLessThan(positions.middle);
     const axis = viewport.width < 900 ? 'y' : 'x';
@@ -302,13 +310,13 @@ test('board renders placeholders during a slow response, supports filters, and r
   await signup(page, 'Load State Reader');
   await expect(page.locator('.crew-welcome-word')).toHaveText('Welcome');
   await expect.poll(() => boardRequests).toBe(1);
-  await page.getByRole('link', { name: 'Board', exact: true }).click();
   const skeleton = page.locator('.crew-gallery-loading .crew-placeholder').first();
   await expect(skeleton).toBeVisible();
   await expect(skeleton).toHaveCSS('animation-name', 'none');
   release();
   await expect(page.getByRole('link', { name: 'Rubber Duck Debuggers' })).toBeVisible();
   expect(boardRequests).toBe(1);
+  await page.getByText('Filter teams', { exact: true }).click();
   const search = page.getByLabel('Search teams');
   await search.fill('Rubber Duck');
   await expect(page.locator('.crew-cover')).toHaveCount(1);
@@ -322,7 +330,7 @@ test('phone layout fits and keyboard can navigate from the board to a team', asy
   await page.getByRole('link', { name: 'Board', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Find a team', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.getByLabel('Search teams')).toBeFocused();
+  await expect(page.getByText('Filter teams', { exact: true })).toBeFocused();
   const link = page.getByRole('link', { name: 'Rubber Duck Debuggers' });
   await link.focus();
   await page.keyboard.press('Enter');
@@ -336,8 +344,8 @@ test('phone layout fits and keyboard can navigate from the board to a team', asy
 test('compact navigation preserves desktop keyboard access and frees space on phones', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await signup(page, 'Compact Navigator');
-  const collapse = page.getByRole('button', { name: 'Collapse navigation' });
-  const expand = page.getByRole('button', { name: 'Expand navigation' });
+  const collapse = page.getByRole('button', { name: 'Collapse sidebar' });
+  const expand = page.getByRole('button', { name: 'Expand sidebar' });
   const board = page.getByRole('link', { name: 'Board', exact: true });
   await collapse.focus();
   await page.keyboard.press('Enter');
@@ -347,9 +355,11 @@ test('compact navigation preserves desktop keyboard access and frees space on ph
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'Find a team' })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 800 });
-  await expect(board).toBeHidden();
-  await expand.click();
   await expect(board).toBeVisible();
+  await expect(page.getByRole('link', { name: 'People', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Overview' })).toBeHidden();
+  await expand.click();
+  await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 });
 
@@ -370,7 +380,7 @@ test('automated accessibility checks pass on sign-in, board and team screens', a
   await expect(page.getByRole('link', { name: 'Rubber Duck Debuggers' })).toBeVisible();
   await scan();
   await page.getByRole('link', { name: 'Rubber Duck Debuggers' }).click();
-  await expect(page.getByRole('button', { name: 'Request to join' })).toBeVisible();
+  await expect(page.getByText('Sample team', { exact: true })).toBeVisible();
   await scan();
   await page.emulateMedia({ colorScheme: 'dark' });
   await scan();
@@ -386,6 +396,51 @@ test('dark system sign-in keeps failed login feedback accessible', async ({ page
   await expect(page.getByRole('alert')).toContainText('The email or password is incorrect');
   const scan = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
   expect(scan.violations).toEqual([]);
+});
+
+test('pasted credentials sign in and profile edits persist on the team board account', async ({ page }) => {
+  const email = await signup(page, 'Profile Editor');
+  await page.getByRole('button', { name: 'Log out' }).click();
+  await page.getByRole('button', { name: 'Skip to sign-in' }).click();
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  async function paste(label, text) {
+    await page.evaluate(value => navigator.clipboard.writeText(value), text);
+    await page.getByLabel(label, { exact: true }).press('Control+V');
+  }
+  await paste('Email', ` \u00a0${email}\u200b `);
+  await paste('Password', ' \u00a0fixture password for browser tests\u200b ');
+  await expect(page.getByLabel('Email', { exact: true })).toHaveValue(email);
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('fixture password for browser tests');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Team gallery' })).toBeVisible();
+  await page.getByRole('link', { name: 'Profile', exact: true }).click();
+  await page.getByRole('link', { name: 'Edit profile' }).click();
+  await page.getByLabel('Display name').fill('Profile Maintainer');
+  const skill = page.getByLabel('Your skills', { exact: true });
+  await skill.fill('Rust');
+  await skill.press('Enter');
+  await page.getByLabel(/What you’re looking for/).fill('A compiler project with a patient team.');
+  await page.getByRole('button', { name: 'Save profile' }).click();
+  await expect(page.getByRole('heading', { name: 'Profile Maintainer' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('A compiler project with a patient team.')).toBeVisible();
+  await expect(page.getByText('Rust', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'People', exact: true }).click();
+  const choice = page.getByRole('list', { name: 'Choose a teammate' }).getByRole('button').nth(1);
+  await choice.click();
+  await expect(choice).toHaveAttribute('aria-pressed', 'true');
+  const peopleScan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(peopleScan.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => node.target) }))).toEqual([]);
+  const name = await page.locator('.people-record h3').innerText();
+  await page.getByRole('link', { name: 'View profile' }).click();
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+  await expect(page.getByText('Email', { exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Board', exact: true }).click();
+  await makeTeam(page, 'Build Instructions');
+  await page.getByRole('link', { name: 'Edit team' }).click();
+  await page.getByLabel('What you are building').fill('We are building a compiler.');
+  await page.getByRole('button', { name: 'Save team' }).click();
+  await expect(page.getByText('We are building a compiler.', { exact: true })).toBeVisible();
 });
 
 test('participant-supplied markup renders as text and does not run', async ({ page }) => {

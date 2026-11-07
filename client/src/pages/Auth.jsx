@@ -3,11 +3,12 @@ import * as api from '../api.js';
 import { LIMITS, browserTimezone } from '../format.js';
 import { useAction } from '../hooks.js';
 import { Button, Field, FormError, Page, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
-import { SignalArt, signalRadius } from './SignalArt.jsx';
+import { SignalArt, signalGeometry } from './SignalArt.jsx';
 
 const looksLikeEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const cleanEmail = value => value.replace(/[\s\u200B]+/g, '');
 
-function PasswordField({ value, onChange, error, hint, autoComplete }) {
+function PasswordField({ value, onChange, onPaste, error, hint, autoComplete }) {
   const [visible, setVisible] = useState(false);
   return (
     <Field label="Password" hint={hint} error={error}>
@@ -22,6 +23,7 @@ function PasswordField({ value, onChange, error, hint, autoComplete }) {
             spellCheck={false}
             autoCapitalize="none"
             autoCorrect="off"
+            onPaste={onPaste}
             onChange={event => onChange(event.target.value)}
           />
           <Button aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(!visible)}>{visible ? 'Hide' : 'Show'}</Button>
@@ -37,19 +39,35 @@ const toSession = async (result, refreshSession) => (result?.user ? result : ref
 function LoginForm({ onSignedIn, refreshSession, onSwitch }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [pastedOriginal, setPastedOriginal] = useState(null);
   const [errors, setErrors] = useState({});
   const action = useAction();
   const form = useFocusFirstInvalid(errors);
 
+  function pastePassword(event) {
+    const input = event.currentTarget;
+    if (input.value && (input.selectionStart !== 0 || input.selectionEnd !== input.value.length)) return;
+    const original = event.clipboardData.getData('text/plain');
+    const cleaned = original.replace(/^[\s\u200B]+|[\s\u200B]+$/g, '');
+    if (original === cleaned || cleaned.length > LIMITS.password[1]) return;
+    event.preventDefault();
+    setPassword(cleaned);
+    setPastedOriginal(original.length <= LIMITS.password[1] ? original : null);
+  }
+
   function submit(event) {
     event.preventDefault();
+    const address = cleanEmail(email);
     const found = {};
-    if (!looksLikeEmail(email.trim())) found.email = 'Enter your email address';
+    if (!looksLikeEmail(address)) found.email = 'Enter your email address';
     if (!password) found.password = 'Enter your password';
     setErrors(found);
     if (Object.keys(found).length) return;
     action.run(async () => {
-      const result = await api.login({ email: email.trim(), password });
+      const result = await api.login({ email: address, password }).catch(error => {
+        if (error.code !== 'INVALID_LOGIN' || !pastedOriginal) throw error;
+        return api.login({ email: address, password: pastedOriginal });
+      });
       onSignedIn(await toSession(result, refreshSession));
     });
   }
@@ -58,9 +76,11 @@ function LoginForm({ onSignedIn, refreshSession, onSwitch }) {
     <form ref={form} onSubmit={submit} noValidate>
       <FormError error={action.error} />
       <Field label="Email" error={errors.email}>
-        {field => <input {...field} type="email" value={email} autoComplete="username" onChange={event => setEmail(event.target.value)} />}
+        {field => <input {...field} type="email" value={email} autoComplete="username"
+          autoCapitalize="none" autoCorrect="off" spellCheck={false} onChange={event => setEmail(cleanEmail(event.target.value))} />}
       </Field>
-      <PasswordField value={password} onChange={setPassword} error={errors.password} autoComplete="current-password" />
+      <PasswordField value={password} onChange={value => { setPastedOriginal(null); setPassword(value); }}
+        onPaste={pastePassword} error={errors.password} autoComplete="current-password" />
       <div className="row">
         <Button type="submit" variant="primary" busy={action.busy} busyLabel="Logging in">Log in</Button>
         <Button onClick={onSwitch}>Create an account</Button>
@@ -186,13 +206,14 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
     previousArt.current = null;
     if (!art || !before || matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
     const after = art.getBoundingClientRect();
-    const fromRadius = signalRadius(before.width, before.height, true);
-    const toRadius = signalRadius(after.width, after.height, false);
-    if (!fromRadius || !toRadius) return undefined;
-    const dx = before.left + before.width / 2 - after.left - after.width / 2;
-    const dy = before.top + before.height / 2 - after.top - after.height / 2;
+    const from = signalGeometry(before.width, before.height, true);
+    const to = signalGeometry(after.width, after.height, false);
+    if (!from.radius || !to.radius) return undefined;
+    const scale = from.radius / to.radius;
+    const dx = before.left + from.x - after.left - to.x * scale;
+    const dy = before.top + from.y - after.top - to.y * scale;
     const animation = art.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(${fromRadius / toRadius})` },
+      { transform: `translate(${dx}px, ${dy}px) scale(${scale})` },
       { transform: 'none' }
     ], { duration: 720, easing: 'cubic-bezier(.35, 0, .2, 1)' });
     return () => animation.cancel();

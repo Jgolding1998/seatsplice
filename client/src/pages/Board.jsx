@@ -4,6 +4,7 @@ import { LIMITS, formatClock, plural } from '../format.js';
 import { useApp, useDebounced, useResource } from '../hooks.js';
 import { Button, Empty, Field, LoadError, Loading, Page, Seats, Skills, Zone } from '../ui.jsx';
 import { GalleryPlaceholder, TeamGallery } from './TeamGallery.jsx';
+import { Welcome } from './Overview.jsx';
 
 function TeamRow({ team, position }) {
   return (
@@ -11,6 +12,7 @@ function TeamRow({ team, position }) {
       <div className="board-main">
         <span className="board-index" aria-hidden="true">{String(position).padStart(2, '0')}</span>
         <h3><a href={`#/teams/${encodeURIComponent(team.id)}`}>{team.name}</a></h3>
+        {team.sample && <p className="sample-label">Sample team</p>}
         <p className="muted">Led by {team.leaderName} · <Zone zone={team.timezone} /></p>
         {team.description && <p className="board-description">{team.description}</p>}
       </div>
@@ -23,10 +25,11 @@ function TeamRow({ team, position }) {
   );
 }
 
-export function BoardPage({ initial }) {
-  const { tick, teamId, boardMemory } = useApp();
-  const [q, setQ] = useState(() => (initial.get('q') ?? '').slice(0, LIMITS.query));
-  const [skill, setSkill] = useState(() => (initial.get('skill') ?? '').slice(0, LIMITS.skillLength));
+export function BoardPage({ initial, path, showWelcome }) {
+  const { tick, teamId, user, boardMemory } = useApp();
+  const hasQuery = initial.has('q') || initial.has('skill');
+  const [q, setQ] = useState(() => (hasQuery ? initial.get('q') ?? '' : boardMemory.current.search?.q ?? '').slice(0, LIMITS.query));
+  const [skill, setSkill] = useState(() => (hasQuery ? initial.get('skill') ?? '' : boardMemory.current.search?.skill ?? '').slice(0, LIMITS.skillLength));
   const [cursors, setCursors] = useState(() => {
     const initialFilters = JSON.stringify([q.trim(), skill.trim()]);
     return initialFilters === boardMemory.current.filters ? boardMemory.current.cursors : [null];
@@ -69,15 +72,15 @@ export function BoardPage({ initial }) {
     if (searchedQ) query.set('q', searchedQ);
     if (searchedSkill) query.set('skill', searchedSkill);
     const text = query.toString();
-    window.history.replaceState(null, '', text ? `#/board?${text}` : '#/board');
-  }, [searchedQ, searchedSkill]);
+    window.history.replaceState(null, '', text ? `#${path}?${text}` : `#${path}`);
+  }, [path, searchedQ, searchedSkill]);
 
   // Say what changed after a search or page change; live refreshes stay silent.
   const describedKey = useRef(null);
   const resultKey = JSON.stringify([filters, pageNumber]);
   useEffect(() => {
-    boardMemory.current = { ...boardMemory.current, display, filters, cursors: pageCursors };
-  }, [boardMemory, display, filters, pageCursors]);
+    boardMemory.current = { ...boardMemory.current, display, filters, cursors: pageCursors, search: { q, skill } };
+  }, [boardMemory, display, filters, pageCursors, q, skill]);
 
   useEffect(() => {
     if (board.loading || !board.data) return;
@@ -110,7 +113,10 @@ export function BoardPage({ initial }) {
 
   return (
     <Page title="Find a team" intro="Find an open seat and ask to join.">
+      {showWelcome && <Welcome name={user.name} />}
       <p className="visually-hidden" role="status">{resultNotice}</p>
+      <details className="board-filter-panel" open={Boolean(initial.get('q') || initial.get('skill'))}>
+        <summary>Filter teams{filtered ? ' · active' : ''}</summary>
       <form className="filters" role="search" onSubmit={event => event.preventDefault()}>
         <Field label="Search teams" hint="Name, description or skill">
           {field => <input {...field} ref={searchInput} type="search" value={q} maxLength={LIMITS.query} onChange={event => setQ(event.target.value)} />}
@@ -127,6 +133,7 @@ export function BoardPage({ initial }) {
         </Field>
         {(q || skill) && <Button onClick={clearFilters}>Clear filters</Button>}
       </form>
+      </details>
 
       <section aria-labelledby="board-results">
         <div className="section-head">
@@ -135,7 +142,10 @@ export function BoardPage({ initial }) {
             <Button aria-pressed={display === 'gallery'} onClick={() => setDisplay('gallery')}>Gallery</Button>
             <Button aria-pressed={display === 'list'} onClick={() => setDisplay('list')}>List</Button>
           </div>
-          {!teamId && <a className="button board-create" href="#/new">Create team <span aria-hidden="true">+</span></a>}
+          {!teamId && <div className="row">
+            <a className="button board-create" href="#/new">Create a team <span aria-hidden="true">+</span></a>
+            <a className="button board-create" href="#/join">Use invite code</a>
+          </div>}
           {board.stale && board.updatedAt && <p className="muted">Could not refresh. Showing teams from {formatClock(board.updatedAt)}</p>}
         </div>
 

@@ -486,6 +486,55 @@ test('suggestions rank complementary nearby skills and omit people on a team', a
   assert.ok(!response.body.people.some(person => person.id === assigned.id || 'email' in person));
 });
 
+test('profile edits are scoped to the caller and expose only public fields to participants', async () => {
+  const editor = await person('Editor', { passwordHash: 'private fixture' });
+  const viewer = await person('Viewer');
+  const id = await team(editor);
+  const profile = { name: 'New display name', skills: ['Rust'], timezone: 'UTC', lookingFor: 'Compiler team' };
+  await post('/profile', editor, { ...profile, id: viewer.id }).expect(400);
+  await post('/profile', null, profile).expect(401);
+  await post('/profile', editor, profile).expect(200);
+  await get(`/people/${editor.id}`).expect(401);
+  const { person: visible } = (await get(`/people/${editor.id}`, viewer).expect(200)).body;
+  assert.deepEqual(visible, { id: editor.id, ...profile, sample: false });
+  assert.equal((await get('/me', viewer)).body.user.name, 'Viewer');
+  assert.equal((await get('/board', viewer)).body.teams.find(team => team.id === id).leaderName, profile.name);
+  assert.equal((await get('/me', editor)).body.user.email, `${editor.id}@example.test`);
+});
+
+test('team edits enforce leader permissions and preserve occupied seats', async () => {
+  const leader = await person('Leader');
+  const applicant = await person('Applicant');
+  const other = await person('Other');
+  const id = await team(leader);
+  await post(decision(id, await join(id, applicant)), leader).expect(200);
+  await post(decision(id, await join(id, other)), leader).expect(200);
+  const updated = { ...draft, maxSize: 4, skills: ['Rust'] };
+  await post(`/teams/${id}/edit`, applicant, updated).expect(403);
+  await post(`/teams/${id}/edit`, leader, { ...updated, maxSize: 2 }).expect(409);
+  await post(`/teams/${id}/edit`, leader, updated).expect(200);
+  const { teams } = (await get('/board?skill=Rust', applicant).expect(200)).body;
+  assert.equal(teams[0].id, id);
+  assert.equal(teams[0].memberCount, 3);
+  assert.equal(teams[0].maxSize, 4);
+});
+
+async function* changeFrames(reader) {
+  const decoder = new TextDecoder();
+  let buffered = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffered += decoder.decode(value, { stream: true });
+    let boundary;
+    while ((boundary = buffered.indexOf('\n\n')) !== -1) {
+      const frame = buffered.slice(0, boundary + 2);
+      buffered = buffered.slice(boundary + 2);
+      if (/^event: change$/m.test(frame)) yield frame;
+    }
+  }
+}
+
 test('SSE sees a committed write from another instance and leaks no event details', async () => {
   const user = await person();
   const abort = new AbortController();
@@ -493,15 +542,14 @@ test('SSE sees a committed write from another instance and leaks no event detail
   try {
     const response = await fetch(url, { headers: { Cookie: user.cookie }, signal: abort.signal });
     assert.equal(response.status, 200);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    assert.match(decoder.decode((await reader.read()).value), /event: change\ndata: {}/);
+    const frames = changeFrames(response.body.getReader());
+    assert.match((await frames.next()).value, /event: change\ndata: {}/);
     await post('/teams', user, draft, { index: 1 }).expect(200);
     const next = await Promise.race([
-      reader.read(),
+      frames.next(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('No cross-instance event')), 5000).unref())
     ]);
-    assert.equal(decoder.decode(next.value), 'event: change\ndata: {}\n\n');
+    assert.equal(next.value, 'event: change\ndata: {}\n\n');
   } finally {
     abort.abort();
   }
@@ -519,19 +567,19 @@ test('a private join request refreshes its leader but not an unrelated viewer', 
     async function stream(user) {
       const response = await fetch(url, { headers: { Cookie: user.cookie }, signal: abort.signal });
       assert.equal(response.status, 200);
-      const reader = response.body.getReader();
-      assert.match(Buffer.from((await reader.read()).value).toString(), /event: change/);
-      return reader;
+      const frames = changeFrames(response.body.getReader());
+      assert.match((await frames.next()).value, /event: change/);
+      return frames;
     }
     const [inbox, boardViewer] = await Promise.all([stream(leader), stream(outsider)]);
     await join(id, applicant);
     const next = await Promise.race([
-      inbox.read(),
+      inbox.next(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Leader received no event')), 5000).unref())
     ]);
-    assert.equal(Buffer.from(next.value).toString(), 'event: change\ndata: {}\n\n');
+    assert.equal(next.value, 'event: change\ndata: {}\n\n');
     const unrelated = await Promise.race([
-      boardViewer.read().then(() => true),
+      boardViewer.next().then(() => true),
       new Promise(resolve => setTimeout(() => resolve(false), 400))
     ]);
     assert.equal(unrelated, false);

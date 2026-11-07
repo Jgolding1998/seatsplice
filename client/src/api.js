@@ -128,11 +128,15 @@ export function getBoard({ q, skill, cursor }, signal) {
 }
 
 export const getTeam = (id, signal) => read(team(id), signal).then(data => data.team);
-export const getSuggestions = signal => read('/api/suggestions', signal).then(data => data.people ?? []);
+export const getPerson = (id, signal) => read(`/api/people/${encodeURIComponent(id)}`, signal).then(data => data.person);
+export const getSuggestions = (signal, q) => read(q ? `/api/suggestions?${new URLSearchParams({ q })}` : '/api/suggestions', signal)
+  .then(data => data.people ?? []);
 export const getOwnRequests = signal => read('/api/requests/mine', signal).then(data => data.requests);
 export const withdrawRequest = (teamId, requestId) => write(`${team(teamId)}/requests/${encodeURIComponent(requestId)}/withdraw`, {});
 
 export const createTeam = body => write('/api/teams', body);
+export const editTeam = (id, body) => write(`${team(id)}/edit`, body);
+export const saveProfile = body => write('/api/profile', body).then(data => data.profile);
 export const requestJoin = id => write(`${team(id)}/requests`);
 export const redeemInvite = code => write('/api/invites/redeem', { code });
 export const decideRequest = (id, requestId, decision) =>

@@ -1,14 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { hash, publicUser } from './auth.js';
+import { hash, publicFields, publicUser } from './auth.js';
 import { eventId, membershipQuery, transaction } from './db.js';
 import { fail } from './input.js';
 
 const hour = 60 * 60 * 1000;
-const publicFields = { _id: 1, name: 1, skills: 1, timezone: 1 };
 const teamSummary = team => ({
   id: team._id, name: team.name, description: team.description, skills: team.skills, timezone: team.timezone,
   minSize: team.minSize, maxSize: team.maxSize, memberCount: team.memberIds.length, leaderName: team.leaderName,
-  ready: team.memberIds.length >= team.minSize
+  ready: team.memberIds.length >= team.minSize, sample: team.fixture === true
 });
 
 export async function once(db, actor, key, route, input, action) {
@@ -94,8 +93,37 @@ export async function createTeam(db, session, actor, input) {
   return { id: teamId };
 }
 
+export async function updateTeam(db, session, actor, teamId, input) {
+  const team = await getTeam(db, session, teamId);
+  requireLeader(team, actor);
+  if (input.maxSize < team.memberIds.length) {
+    fail(409, 'SEATS_OCCUPIED', 'Maximum seats must fit everyone already on the team.');
+  }
+  await changeTeam(db, session, team, {
+    ...input, skillKeys: input.skills.map(skill => skill.toLowerCase()), open: team.memberIds.length < input.maxSize
+  });
+  await record(db, session, teamId, 'team_updated', actor, actor, team.memberIds);
+  return { id: teamId };
+}
+
+export async function updateProfile(db, session, actor, profile) {
+  const user = await db.users.findOneAndUpdate({ _id: actor._id }, { $set: profile }, {
+    returnDocument: 'after', projection: { passwordHash: 0 }, session
+  });
+  const membership = await db.memberships.findOne(membershipQuery(actor._id), { session });
+  if (membership) {
+    const team = await getTeam(db, session, membership.teamId);
+    if (team.leaderId === actor._id && team.leaderName !== user.name) {
+      await changeTeam(db, session, team, { leaderName: user.name });
+    }
+    await record(db, session, team._id, 'profile_updated', user, user, team.memberIds);
+  }
+  return { profile: publicUser(user) };
+}
+
 export async function requestJoin(db, session, actor, teamId) {
   const team = await getTeam(db, session, teamId);
+  if (team.fixture) fail(409, 'SAMPLE_TEAM', 'This sample team is for browsing.');
   await requireUnassigned(db, session, actor._id);
   const existing = await db.requests.findOne({ teamId, userId: actor._id, status: 'pending' }, { session });
   if (existing) return { id: existing._id, teamId, status: 'pending' };
@@ -270,6 +298,7 @@ export async function details(db, actor, teamId) {
 }
 
 const suggestionCache = new WeakMap();
+export const clearSuggestions = db => suggestionCache.delete(db);
 
 function candidatePool(db) {
   const now = Date.now();
@@ -289,7 +318,7 @@ function candidatePool(db) {
   return result;
 }
 
-export async function suggestions(db, actor) {
+export async function suggestions(db, actor, query = '') {
   const membership = await db.memberships.findOne(membershipQuery(actor._id));
   const team = membership ? await db.teams.findOne({ _id: membership.teamId }) : null;
   const covered = team
@@ -309,7 +338,10 @@ export async function suggestions(db, actor) {
   }
   const people = await candidatePool(db);
   const actorOffset = offset(actor.timezone);
-  return { people: people.filter(user => user._id !== actor._id).map(user => {
+  const text = query.toLowerCase();
+  return { people: people.filter(user => user._id !== actor._id && (
+    !text || user.name.toLowerCase().includes(text) || user.skills.some(skill => skill.toLowerCase().includes(text))
+  )).map(user => {
     const additions = user.skills.filter(skill => !known.has(skill.toLowerCase()));
     const difference = Math.abs(offset(user.timezone) - actorOffset) % 1440;
     const hours = Math.min(difference, 1440 - difference) / 60;

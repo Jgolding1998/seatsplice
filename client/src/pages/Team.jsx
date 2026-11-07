@@ -76,7 +76,7 @@ function Members({ team, isLeader, currentUserId, resource }) {
           <li key={member.id} className="member">
             <div>
               <p className="member-name">
-                {member.name}
+                <a href={`#/people/${member.id}`}>{member.name}</a>
                 {member.id === team.leaderId && <span className="tag">Leader</span>}
                 {member.id === currentUserId && <span className="tag">You</span>}
               </p>
@@ -149,7 +149,7 @@ function Inbox({ team, resource, refreshSession }) {
           {requests.map((request, index) => (
             <li key={request.id} className="member">
               <div>
-                <p className="member-name">{request.user.name}</p>
+                <p className="member-name"><a href={`#/people/${request.user.id}`}>{request.user.name}</a></p>
                 <p className="muted"><Zone zone={request.user.timezone} /> · asked <Time value={request.createdAt} /></p>
                 <Skills skills={request.user.skills} label={`Skills of ${request.user.name}`} />
               </div>
@@ -324,6 +324,7 @@ function TeamDetail({ team, resource }) {
   return (
     <div className="team">
       <section className="team-summary panel panel-lead" aria-label="Team summary">
+        {team.sample && <p className="sample-label">Sample team</p>}
         {team.description && <p className="team-description">{team.description}</p>}
         <Seats team={team} />
         <dl className="details">
@@ -332,9 +333,13 @@ function TeamDetail({ team, resource }) {
           <dt>Size</dt><dd>Up to {team.maxSize} seats, active from {team.minSize}</dd>
         </dl>
         <Skills skills={team.skills} label="Skills the team wants" />
-        {isMember
-          ? <div className="row team-actions"><LeaveControl team={team} isLeader={isLeader} /></div>
-          : <JoinPanel team={team} resource={resource} />}
+        {isMember && <div className="row team-actions">
+          {isLeader && <a className="button" href={`#/teams/${team.id}/edit`}>Edit team</a>}
+          <LeaveControl team={team} isLeader={isLeader} />
+        </div>}
+        {!isMember && (team.sample
+          ? <p className="muted">This sample is for browsing. You can request a seat on a team led by a participant.</p>
+          : <JoinPanel team={team} resource={resource} />)}
       </section>
       {isLeader && <Inbox team={team} resource={resource} refreshSession={refreshSession} />}
       {isLeader && <Invites team={team} />}

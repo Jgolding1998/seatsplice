@@ -4,6 +4,12 @@ const skills = ['React', 'Node.js', 'Design', 'MongoDB', 'Testing', 'DevOps', 'T
 const zones = ['America/Chicago', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Asia/Kolkata', 'Asia/Tokyo'];
 const first = ['Ada', 'Grace', 'Linus', 'Margaret', 'Katherine', 'Guido', 'Ava', 'Jules', 'Maya', 'Sam', 'Lin', 'Kai'];
 const last = ['Knuth', 'Shannon', 'Lamport', 'Hopper', 'Lovelace', 'Turing', 'Kernighan', 'Hamilton', 'Babbage', 'Ng'];
+const lookingFor = [
+  'A weekend project that makes everyday life a little less annoying.',
+  'A small team that wants to ship a working prototype.',
+  'Something with a dashboard, real data, and a reasonable number of tabs.',
+  'A project where design and accessibility are part of the first commit.'
+];
 const samples = [
   ['Rubber Duck Debuggers', 'We have a duck and no roadmap. Looking for someone with either a data model or a second duck.'],
   ['Stack Underflow', 'One exception away from a breakthrough. Working on a tiny dashboard for huge logs.'],
@@ -35,6 +41,7 @@ export async function seedFixtures(db, { participants = 10000, teamCount = 2000 
     name: `${first[index % first.length]} ${last[Math.floor(index / first.length) % last.length]}`,
     skills: [skills[index % skills.length], skills[(index + 3) % skills.length]],
     timezone: zones[index % zones.length],
+    ...(participants <= 100 && { lookingFor: lookingFor[index % lookingFor.length] }),
     fixture: true
   }));
   const memberships = [];

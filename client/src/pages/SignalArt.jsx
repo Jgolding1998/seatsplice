@@ -80,8 +80,13 @@ const dotPosition = [
   dot.y * tiltSin + dotDepth * tiltCos
 ];
 
-export function signalRadius(width, height, opening) {
-  return opening ? Math.min(height * .44, width * .95) : Math.min(width, height) * radiusScale;
+export function signalGeometry(width, height, opening) {
+  if (opening) return { x: width / 2, y: height / 2, radius: Math.min(height * .44, width * .95) };
+  const wide = window.innerWidth >= 900;
+  return {
+    x: width * (wide ? .56 : .655), y: height * (wide ? .36 : .505),
+    radius: Math.min(width * (wide ? .9 : .69), height * (wide ? .62 : .99)) * radiusScale
+  };
 }
 
 export function SignalArt({ artRef, onOpenSignIn }) {
@@ -116,9 +121,9 @@ export function SignalArt({ artRef, onOpenSignIn }) {
     function paint() {
       if (!width || !height) return;
       ctx.clearRect(0, 0, width, height);
-      const baseRadius = signalRadius(width, height, Boolean(dotRef.current));
+      const { x: centerX, y: centerY, radius: baseRadius } = signalGeometry(width, height, Boolean(dotRef.current));
       const radius = baseRadius * zoom;
-      const pointScale = baseRadius / Math.max(1, signalRadius(window.innerWidth, window.innerHeight, true));
+      const pointScale = baseRadius / Math.max(1, signalGeometry(window.innerWidth, window.innerHeight, true).radius);
       const [a, b, c, d, e, f, g, h, i] = matrix(rotation);
       const compact = window.innerWidth < 600;
       for (const [x, y, z, grain] of points) {
@@ -127,8 +132,8 @@ export function SignalArt({ artRef, onOpenSignIn }) {
         const v = d * x + e * y + f * z;
         const depth = g * x + h * y + i * z;
         const lit = Math.max(0, Math.min(.999, .30 + .20 * depth - .25 * v - .18 * u + .29 * grain));
-        const px = width * .5 + u * radius + 5 * pointScale * (grain - .5);
-        const py = height * .5 + v * radius;
+        const px = centerX + u * radius + 5 * pointScale * (grain - .5);
+        const py = centerY + v * radius;
         const size = (grain > .96 ? 1.9 : .65 + .75 * grain) * pointScale * Math.min(zoom, 1.8);
         ctx.globalAlpha = .20 + .80 * lit;
         ctx.fillStyle = shades[Math.floor(lit * shades.length)];
@@ -240,7 +245,7 @@ export function SignalArt({ artRef, onOpenSignIn }) {
       if (!suppressClick && Math.hypot(dx, dy) < 4) return;
       suppressClick = true;
       const elapsed = Math.max(8, event.timeStamp - drag.timeStamp);
-      const radiansPerPixel = 1 / Math.max(60, signalRadius(width, height, Boolean(dotRef.current)) * zoom);
+      const radiansPerPixel = 1 / Math.max(60, signalGeometry(width, height, Boolean(dotRef.current)).radius * zoom);
       const rotationX = dx * radiansPerPixel;
       const rotationY = dy * radiansPerPixel;
       drag.x = event.clientX;

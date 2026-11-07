@@ -18,8 +18,7 @@
 .auth > .auth-story::before { content: none; }
 .auth-story > .brand { width: max-content; color: #fff4df; }
 .auth > .signal-stage {
-  position: absolute; z-index: 0; grid-area: 1 / 1 / 2 / 2;
-  inset: 1% 0 0 31%;
+  position: absolute; z-index: 0; grid-area: 1 / 1 / 2 / 2; inset: 0;
 }
 .signal-control {
   display: block; width: 100%; height: 100%; padding: 0; border: 0;
@@ -27,10 +26,9 @@
 }
 .signal-control:active { cursor: grabbing; }
 .signal-control:focus-visible { outline: 2px solid #e2bd70; outline-offset: -6px; }
-.auth.auth-intro > .signal-stage { inset: 0; }
 .signal-art {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  pointer-events: none; opacity: .85;
+  transform-origin: 0 0; pointer-events: none; opacity: .85;
 }
 .auth-story > .signal-skip {
   position: absolute; z-index: 1; right: clamp(20px, 4.8vw, 72px); bottom: max(24px, env(safe-area-inset-bottom));
@@ -99,14 +97,20 @@
 .rail-toggle { width: 44px; min-height: 44px; padding: 6px; }
 .rail nav a { gap: 10px; }
 .rail nav svg { flex: none; }
-.rail-compact .rail nav { display: none; }
+.rail-compact .rail :is(.rail-label, .rail-foot, nav li:not(.rail-primary)) { display: none; }
+@media (max-width: 899px) {
+  .shell { grid-template-rows: auto 1fr; }
+  .rail-compact .rail { grid-template-columns: minmax(0, 1fr) auto; padding-block: 6px; }
+  .rail-compact .rail .brand { display: none; }
+  .rail-compact .rail nav { grid-column: 1; grid-row: 1; }
+  .rail-compact .rail-toggle { grid-column: 2; grid-row: 1; }
+}
 @media (max-width: 470px) {
   .rail-foot .connection { display: none; }
 }
 @media (min-width: 900px) {
   .auth { grid-template-rows: minmax(100dvh, auto); }
   .auth > .auth-story { min-height: 100dvh; padding-block: 38px 30px; }
-  .auth > .signal-stage { inset: 5% -1% 33% 11%; }
   .auth-panel { grid-row: 1; grid-column: 2; }
   .auth-opened > .auth-panel { --panel-enter: translateX(100%); }
   .auth-line { text-shadow: none; }
@@ -123,12 +127,18 @@
   .shell.rail-compact { grid-template-columns: 74px minmax(0, 1fr); }
   .rail-compact .rail { padding-inline: 10px; align-items: center; }
   .rail-compact .rail-top { display: grid; justify-items: center; }
-  .rail-compact .rail nav { display: block; }
   .rail-compact .rail nav a { justify-content: center; width: 44px; min-height: 44px; padding: 0; }
-  .rail-compact .rail-foot { align-items: center; width: 100%; }
-  .rail-compact .rail-foot .button { min-height: 44px; width: 44px; padding: 4px; font-size: 11px; }
-  .rail-compact :is(.rail-text, .rail-label, .rail-user, .rail-stamp, .connection span:last-child) {
+  .rail-compact .rail-text {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
     clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; border: 0;
   }
 }
+
+.board-filter-panel { margin: 0 0 16px; }
+.board-filter-panel summary { width: fit-content; padding: 8px 12px; min-height: 44px; cursor: pointer; }
+.board-filter-panel[open] { border-bottom: 1px solid var(--line); }
+.board-filter-panel .filters { margin-top: 8px; }
+.sample-label { color: var(--ink-2); font: 650 11px/1.5 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.profile-card { max-width: 580px; margin-block-end: 18px; }
+.profile-card > :not(:last-child) { margin-bottom: 16px; }
+.profile-card > h2 { margin-bottom: 7px; }

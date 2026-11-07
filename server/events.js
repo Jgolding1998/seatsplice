@@ -1,4 +1,4 @@
-const boardChanges = new Set(['team_created', 'join_approved', 'invite_accepted', 'member_left', 'member_removed', 'team_deleted']);
+const boardChanges = new Set(['team_created', 'team_updated', 'profile_updated', 'join_approved', 'invite_accepted', 'member_left', 'member_removed', 'team_deleted']);
 
 export function createEvents(db, log = console, onBoardChange = () => {}) {
   const streams = new Set();

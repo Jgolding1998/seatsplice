@@ -17,7 +17,11 @@ function readToken(req) {
 }
 
 const cookieOptions = secure => ({ httpOnly: true, sameSite: 'strict', secure, path: '/' });
-export const publicUser = user => ({ id: user._id, name: user.name, skills: user.skills, timezone: user.timezone });
+export const publicFields = { name: 1, skills: 1, timezone: 1, lookingFor: 1, fixture: 1 };
+export const publicUser = user => ({
+  id: user._id, name: user.name, skills: user.skills, timezone: user.timezone,
+  lookingFor: user.lookingFor ?? '', sample: user.fixture === true
+});
 export const ownUser = user => ({ ...publicUser(user), email: user.email });
 
 export async function activeSession(db, req) {

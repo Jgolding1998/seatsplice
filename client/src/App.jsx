@@ -6,19 +6,22 @@ import { errorText, plural } from './format.js';
 import { Button, Loading, LoadError, Page } from './ui.jsx';
 import { AuthPage } from './pages/Auth.jsx';
 import { BoardPage } from './pages/Board.jsx';
-import { CreateTeamPage } from './pages/CreateTeam.jsx';
+import { CreateTeamPage, EditTeamPage } from './pages/CreateTeam.jsx';
 import { JoinPage } from './pages/Join.jsx';
 import { OverviewPage } from './pages/Overview.jsx';
 import { PeoplePage } from './pages/People.jsx';
+import { EditProfilePage, ProfilePage } from './pages/Profile.jsx';
 import { TeamPage } from './pages/Team.jsx';
 
-const TEAM_ROUTE = /^\/teams\/([A-Za-z0-9-]{1,64})$/;
+const TEAM_ROUTE = /^\/teams\/([A-Za-z0-9-]{1,64})(\/edit)?$/;
+const PERSON_ROUTE = /^\/people\/([A-Za-z0-9-]{1,64})$/;
 const CONNECTION_TEXT = { connecting: 'Connecting', live: 'Live', reconnecting: 'Reconnecting' };
 const NAV_ICONS = {
   Overview: 'M3 10l9-7 9 7v11h-6v-7H9v7H3z',
   Board: 'M3 4h18v16H3zM9 4v16m6-16v16',
   'My team': 'M3 6h18v13H3zM3 10h18m-12 3v3m6-3v3',
-  People: 'M8 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-7a3 3 0 0 1 0 6M2 21v-1a6 6 0 0 1 12 0v1m2-6a5 5 0 0 1 6 5v1'
+  People: 'M8 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-7a3 3 0 0 1 0 6M2 21v-1a6 6 0 0 1 12 0v1m2-6a5 5 0 0 1 6 5v1',
+  Profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21v-1a8 8 0 0 1 16 0v1'
 };
 
 function RailIcon({ path }) {
@@ -29,7 +32,7 @@ function NotFound() {
   return (
     <Page title="Page not found">
       <p>This address does not match anything in Seatsplice.</p>
-      <p><a href="#/">Go to overview</a></p>
+      <p><a href="#/">Browse teams</a></p>
     </Page>
   );
 }
@@ -51,7 +54,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   useFocusRescue(main);
 
   useEffect(() => {
-    if (window.location.hash === '' || window.location.hash === '#/') {
+    if (window.location.hash === '#/overview') {
       api.prefetchBoard();
     }
     return api.clearBoardPrefetch;
@@ -102,10 +105,13 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
 
   // A failed refresh must not make a completed action look failed. The next live tick catches up.
   const safeRefresh = useCallback(() => refreshSession().catch(() => null), [refreshSession]);
+  const updateProfile = useCallback(profile => setSession(current => (
+    current.user?.id === profile.id ? { ...current, user: { ...current.user, ...profile } } : current
+  )), [setSession]);
 
   const context = useMemo(() => ({
-    user, teamId, tick, announce, refreshSession: safeRefresh, ownTeam, boardMemory
-  }), [user, teamId, tick, announce, safeRefresh, ownTeam]);
+    user, teamId, tick, announce, refreshSession: safeRefresh, ownTeam, boardMemory, updateProfile
+  }), [user, teamId, tick, announce, safeRefresh, ownTeam, updateProfile]);
 
   const handleLogout = () => signOut.run(async () => {
     await api.logout();
@@ -115,20 +121,25 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   });
 
   const teamMatch = TEAM_ROUTE.exec(route.path);
+  const personMatch = PERSON_ROUTE.exec(route.path);
+  const onBoard = route.path === '/' || route.path === '/board';
   const links = [
-    ['/', 'Overview'],
     ['/board', 'Board'],
+    ['/people', 'People'],
+    ['/overview', 'Overview'],
     ...(teamId ? [[`/teams/${teamId}`, inboxCount ? `My team (${inboxCount})` : 'My team']] : []),
-    ['/people', 'People']
+    [`/people/${user.id}`, 'Profile']
   ];
 
   let page;
-  if (route.path === '/') page = <OverviewPage showWelcome={welcomePath === route.path} />;
-  else if (route.path === '/board') page = <BoardPage initial={route.params} />;
+  if (onBoard) page = <BoardPage initial={route.params} path={route.path} showWelcome={welcomePath === route.path} />;
+  else if (route.path === '/overview') page = <OverviewPage />;
   else if (route.path === '/people') page = <PeoplePage />;
+  else if (route.path === '/profile/edit') page = <EditProfilePage />;
+  else if (personMatch) page = <ProfilePage id={personMatch[1]} />;
   else if (route.path === '/new') page = <CreateTeamPage />;
   else if (route.path === '/join') page = <JoinPage initialCode={route.params.get('code') ?? ''} />;
-  else if (teamMatch) page = <TeamPage id={teamMatch[1]} />;
+  else if (teamMatch) page = teamMatch[2] ? <EditTeamPage id={teamMatch[1]} /> : <TeamPage id={teamMatch[1]} />;
   else page = <NotFound />;
 
   return (
@@ -138,16 +149,16 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
         <header className="rail">
           <div className="rail-top">
             <a className="brand" href="#/" title="Seatsplice"><span className="brand-mark" aria-hidden="true" /><span className="rail-text">Seatsplice</span></a>
-            <Button className="rail-toggle" aria-label={compact ? 'Expand navigation' : 'Collapse navigation'} aria-controls="main-navigation" aria-expanded={!compact} title={compact ? 'Expand navigation' : 'Collapse navigation'} onClick={() => setCompact(value => !value)}>
+            <Button className="rail-toggle" aria-label={compact ? 'Expand sidebar' : 'Collapse sidebar'} aria-controls="main-navigation sidebar-details" aria-expanded={!compact} title={compact ? 'Expand sidebar' : 'Collapse sidebar'} onClick={() => setCompact(value => !value)}>
               <RailIcon path={compact ? 'M3 4h18v16H3zM8 4v16m4-11 3 3-3 3' : 'M3 4h18v16H3zM8 4v16m7-11-3 3 3 3'} />
             </Button>
           </div>
           <nav id="main-navigation" aria-label="Main">
             <p className="rail-label" aria-hidden="true">Workspace</p>
             <ul>
-              {links.map(([path, label]) => (
-                <li key={path}>
-                  <a href={`#${path}`} title={label} aria-current={route.path === path ? 'page' : undefined} onClick={event => {
+              {links.map(([path, label], index) => (
+                <li key={path} className={index < 2 ? 'rail-primary' : undefined}>
+                  <a href={`#${path}`} title={label} aria-current={route.path === path || (onBoard && path === '/board') ? 'page' : undefined} onClick={event => {
                     if (path !== route.path && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
                       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                       setTabReveal(path);
@@ -157,7 +168,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
               ))}
             </ul>
           </nav>
-          <div className="rail-foot">
+          <div id="sidebar-details" className="rail-foot">
             <p className={`connection connection-${connection}`}>
               <span className="connection-dot" aria-hidden="true" />
               <span><span className="visually-hidden">Updates: </span>{CONNECTION_TEXT[connection]}</span>
@@ -168,7 +179,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
             <p className="rail-stamp">May contain traces of recursion.</p>
           </div>
         </header>
-        <main ref={main} id="main" className={route.path === '/board' ? 'board-view' : undefined}>
+        <main ref={main} id="main" className={onBoard ? 'board-view' : undefined}>
           <React.Fragment key={route.path}>
             {page}
             {tabReveal === route.path && (

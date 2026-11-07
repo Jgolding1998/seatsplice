@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import * as api from '../api.js';
 import { LIMITS, SIZES, browserTimezone } from '../format.js';
 import { navigate, useAction, useApp } from '../hooks.js';
-import { Button, Field, FormError, Page, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
+import { Button, Field, FormError, LoadError, Loading, Page, SkillsInput, TimezoneSelect, useFocusFirstInvalid } from '../ui.jsx';
 
 function SizeSelect({ value, onChange, ...field }) {
   return (
@@ -12,11 +12,12 @@ function SizeSelect({ value, onChange, ...field }) {
   );
 }
 
-export function CreateTeamPage() {
-  const { teamId, refreshSession, announce } = useApp();
-  const [values, setValues] = useState({
-    name: '', description: '', skills: [], timezone: browserTimezone(), minSize: 2, maxSize: 6
-  });
+function TeamForm({ team }) {
+  const { refreshSession, announce, ownTeam } = useApp();
+  const [values, setValues] = useState(() => ({
+    name: team?.name ?? '', description: team?.description ?? '', skills: team?.skills ?? [],
+    timezone: team?.timezone ?? browserTimezone(), minSize: team?.minSize ?? 2, maxSize: team?.maxSize ?? 6
+  }));
   const [errors, setErrors] = useState({});
   const action = useAction();
   const form = useFocusFirstInvalid(errors);
@@ -29,27 +30,21 @@ export function CreateTeamPage() {
     if (name.length < LIMITS.teamName[0]) found.name = `Enter at least ${LIMITS.teamName[0]} characters`;
     if (!values.skills.length) found.skills = 'Add at least one skill, so people can find your team';
     if (values.minSize > values.maxSize) found.maxSize = 'Maximum must be at least the minimum';
+    if (team && values.maxSize < team.memberCount) found.maxSize = 'Maximum must fit everyone on your team';
     setErrors(found);
     if (Object.keys(found).length) return;
     action.run(async () => {
-      const { id } = await api.createTeam({ ...values, name, description: values.description.trim() });
-      await refreshSession();
-      announce(`${name} created. You are its leader`);
+      const data = { ...values, name, description: values.description.trim() };
+      const { id } = team ? await api.editTeam(team.id, data) : await api.createTeam(data);
+      if (team) await ownTeam.reload();
+      else await refreshSession();
+      announce(team ? 'Team updated' : `${name} created. You are its leader`);
       navigate(`/teams/${id}`);
     });
   }
 
-  if (teamId) {
-    return (
-      <Page title="Create a team">
-        <p>You are already on a team, and each person can be on one team only.</p>
-        <p><a href={`#/teams/${teamId}`}>Go to my team</a></p>
-      </Page>
-    );
-  }
-
   return (
-    <Page title="Create a team" intro="You become the leader and take the first seat">
+    <Page title={team ? 'Edit team' : 'Create a team'} intro={team ? 'Update what you’re building and who you need.' : 'You become the leader and take the first seat'}>
       <form ref={form} className="form-narrow" onSubmit={submit} noValidate>
         <FormError error={action.error} />
         <Field label="Team name" error={errors.name}>
@@ -61,7 +56,7 @@ export function CreateTeamPage() {
         <Field label="Skills the team wants" hint={`Press Enter after each one, up to ${LIMITS.skillCount}`} error={errors.skills}>
           {field => <SkillsInput value={values.skills} onChange={value => set('skills', value)} inputProps={field} />}
         </Field>
-        <Field label="Team time zone" hint="Set from this browser">
+        <Field label="Team time zone">
           {field => <TimezoneSelect {...field} value={values.timezone} onChange={value => set('timezone', value)} />}
         </Field>
         <div className="row row-fields">
@@ -73,10 +68,29 @@ export function CreateTeamPage() {
           </Field>
         </div>
         <div className="row">
-          <Button type="submit" variant="primary" busy={action.busy} busyLabel="Creating team">Create team</Button>
-          <a className="button button-quiet" href="#/">Cancel</a>
+          <Button type="submit" variant="primary" busy={action.busy} busyLabel={team ? 'Saving team' : 'Creating team'}>{team ? 'Save team' : 'Create team'}</Button>
+          <a className="button button-quiet" href={team ? `#/teams/${team.id}` : '#/'}>Cancel</a>
         </div>
       </form>
     </Page>
   );
+}
+
+export function CreateTeamPage() {
+  const { teamId } = useApp();
+  if (!teamId) return <TeamForm />;
+  return (
+    <Page title="Create a team">
+      <p>You’re already on a team.</p>
+      <p><a href={`#/teams/${teamId}`}>Go to my team</a></p>
+    </Page>
+  );
+}
+
+export function EditTeamPage({ id }) {
+  const { teamId, user, ownTeam } = useApp();
+  if (teamId === id && ownTeam.loading && !ownTeam.data) return <Page title="Edit team"><Loading label="Loading team" /></Page>;
+  if (teamId === id && ownTeam.error) return <Page title="Edit team"><LoadError error={ownTeam.error} onRetry={ownTeam.retry} /></Page>;
+  if (teamId === id && ownTeam.data?.leaderId === user.id) return <TeamForm team={ownTeam.data} />;
+  return <Page title="Edit team"><p>Only the team leader can edit this team.</p><a href={`#/teams/${id}`}>View team</a></Page>;
 }

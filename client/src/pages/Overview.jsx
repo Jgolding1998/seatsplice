@@ -76,7 +76,7 @@ function FindCrewPanel() {
   );
 }
 
-function Welcome({ name }) {
+export function Welcome({ name }) {
   const word = 'Welcome';
   const [text, setText] = useState(word);
   const first = name.trim().split(/\s+/)[0];
@@ -101,12 +101,11 @@ function Welcome({ name }) {
   );
 }
 
-export function OverviewPage({ showWelcome }) {
+export function OverviewPage() {
   const { user, teamId } = useApp();
   const people = useSuggestions();
   return (
     <Page title="Overview">
-      {showWelcome && <Welcome name={user.name} />}
       <div className="overview">
         <div className="overview-main">
           {teamId ? <MyTeamPanel /> : <FindCrewPanel />}
@@ -131,6 +130,7 @@ export function OverviewPage({ showWelcome }) {
             <dt>Time zone</dt><dd><Zone zone={user.timezone} /></dd>
           </dl>
           <Skills skills={user.skills} label="Your skills" />
+          <p><a href="#/profile/edit">Edit profile</a></p>
         </aside>
       </div>
     </Page>

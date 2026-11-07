@@ -97,10 +97,17 @@ export function createApp(db, {
   api.get('/teams/:id', async (req, res) => {
     res.json(await teams.details(db, req.auth.user, input.parse(input.id, req.params.id)));
   });
+  api.get('/people/:id', async (req, res) => {
+    const id = input.parse(input.id, req.params.id);
+    const person = await db.users.findOne({ _id: id }, { projection: auth.publicFields });
+    if (!person) input.fail(404, 'PERSON_NOT_FOUND', 'This profile is no longer available.');
+    res.json({ person: auth.publicUser(person) });
+  });
   api.get('/requests/mine', async (req, res) => res.json(await teams.ownRequests(db, req.auth.user)));
   api.get('/suggestions', async (req, res) => {
     await auth.consumeLimit(db, 'suggestions', req.auth.user._id, 30, minute);
-    res.json(await teams.suggestions(db, req.auth.user));
+    const { q } = input.parse(input.peopleFilters, req.query);
+    res.json(await teams.suggestions(db, req.auth.user, q));
   });
   api.get('/events', (req, res) => {
     if (!events.open(res, req.auth)) input.fail(429, 'TOO_MANY_STREAMS', 'Close another Seatsplice tab and retry.');
@@ -122,6 +129,7 @@ export function createApp(db, {
         return { ...await action(session, actor, req.params, data, codeFor(nonce)), nonce };
       });
       clearBoardRead();
+      if (route === '/profile') teams.clearSuggestions(db);
       if (!invite) return res.json(result);
       const { nonce, ...publicResult } = result;
       return res.json({ ...publicResult, code: codeFor(nonce) });
@@ -130,6 +138,8 @@ export function createApp(db, {
   write('/teams', input.team, (session, actor, _params, data) => teams.createTeam(db, session, actor, data), {
     extraLimit: req => auth.consumeLimit(db, 'create-team', req.auth.user._id, 8, 15 * minute)
   });
+  write('/teams/:id/edit', input.team, (session, actor, params, data) => teams.updateTeam(db, session, actor, params.id, data));
+  write('/profile', input.profile, (session, actor, _params, data) => teams.updateProfile(db, session, actor, data));
   write('/teams/:id/requests', input.empty, (session, actor, params) => teams.requestJoin(db, session, actor, params.id));
   write('/teams/:id/requests/:requestId/approve', input.empty, (session, actor, params) =>
     teams.decideRequest(db, session, actor, params.id, params.requestId, 'approved'));

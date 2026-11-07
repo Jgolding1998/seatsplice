@@ -4,6 +4,7 @@ export const LIMITS = {
   password: [12, 128],
   teamName: [2, 60],
   description: 320,
+  lookingFor: 160,
   skillLength: 28,
   skillCount: 8,
   query: 80
@@ -55,6 +56,8 @@ export function plural(count, singular, many = `${singular}s`) {
 
 const AUDIT_TEXT = {
   team_created: entry => `${entry.actorName} created the team`,
+  team_updated: entry => `${entry.actorName} updated the team`,
+  profile_updated: entry => `${entry.actorName} updated their profile`,
   join_requested: entry => `${entry.actorName} asked to join`,
   invite_accepted: entry => `${entry.actorName} claimed a seat with an invite code`,
   join_cancelled: entry => `${entry.actorName}'s request was cancelled because they joined a team`,

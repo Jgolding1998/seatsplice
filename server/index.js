@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { connect } from './db.js';
 import { createApp } from './app.js';
+import { seedFixtures } from './fixtures.js';
 
 const { MONGO_URL, MONGO_DATABASE = 'crewboard', NODE_ENV, APP_ORIGIN, RENDER_EXTERNAL_URL, INVITE_SECRET } = process.env;
 const trustProxy = process.env.TRUST_PROXY ?? '0';
@@ -24,6 +25,13 @@ if ((secure || INVITE_SECRET !== undefined) &&
   throw new Error('Set INVITE_SECRET to 32 random bytes encoded as hex or standard base64.');
 }
 const db = await connect(MONGO_URL, MONGO_DATABASE);
+if (secure && origin === 'https://seatsplice-ps1.onrender.com') {
+  try {
+    await seedFixtures(db, { participants: 36, teamCount: 8 });
+  } catch (error) {
+    console.error('Could not load demo samples', { name: error.name, code: error.code });
+  }
+}
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 const { app, events } = createApp(db, {
   origin, secure, trustProxy: Number(trustProxy), inviteSecret,
