@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { plural } from '../format.js';
 import { SeatRow, Skills, Zone } from '../ui.jsx';
+import { useGalleryDrag } from './useGalleryDrag.js';
 import './team-gallery.css';
 
 const covers = [
@@ -113,13 +114,12 @@ export function TeamGallery({ teams, pageNumber, initialTeam, rememberTeam }) {
     rememberTeam(id);
   }
   const region = useRef(null);
-  const touch = useRef(null);
-  const swallowClickUntil = useRef(0);
   const count = teams.length;
   const active = Math.max(0, teams.findIndex(team => team.id === selected));
   const team = teams[active];
   const position = (pageNumber - 1) * 12 + active + 1;
   const step = direction => select(teams[(active + direction + count) % count].id);
+  const drag = useGalleryDrag(step, count);
 
   function onKeys(event) {
     if (event.altKey || event.ctrlKey || event.metaKey || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -132,33 +132,10 @@ export function TeamGallery({ teams, pageNumber, initialTeam, rememberTeam }) {
     if (event.target.closest('a')) region.current?.focus({ preventScroll: true });
   }
 
-  function onPointerUp(event) {
-    if (!touch.current || touch.current.id !== event.pointerId) return;
-    const dx = event.clientX - touch.current.x;
-    const dy = event.clientY - touch.current.y;
-    touch.current = null;
-    if (count > 1 && Math.abs(dx) > 42 && Math.abs(dx) > 1.25 * Math.abs(dy)) {
-      swallowClickUntil.current = performance.now() + 400;
-      step(dx < 0 ? 1 : -1);
-    }
-  }
-
   return (
     <div ref={region} className="crew-gallery" role="region" aria-label="Team gallery"
       aria-roledescription="carousel" tabIndex={0} onKeyDown={onKeys}>
-      <div className="crew-stage" data-cover={covers[coverIndex(team)].theme}
-        onPointerDown={event => {
-          if (event.pointerType === 'touch' || event.pointerType === 'pen') {
-            touch.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
-          }
-        }}
-        onPointerUp={onPointerUp} onPointerCancel={() => { touch.current = null; }}
-        onClickCapture={event => {
-          if (event.detail > 0 && performance.now() < swallowClickUntil.current) {
-            event.preventDefault();
-            event.stopPropagation();
-          }
-        }}>
+      <div className="crew-stage" data-cover={covers[coverIndex(team)].theme} {...drag}>
         <div className="crew-watermark" aria-hidden="true">OPEN<br />SEATS</div>
         {teams.map((item, index) => {
           const relative = (index - active + count) % count;
@@ -186,17 +163,17 @@ export function TeamGallery({ teams, pageNumber, initialTeam, rememberTeam }) {
       <div className="crew-gallery-bar">
         <div className="crew-gallery-caption">
           <span className="crew-caption-index" aria-hidden="true">{String(position).padStart(2, '0')}</span>
-          <div>
+          <div className="crew-caption-copy" key={team.id}>
             <h3>{team.name}</h3>
             <p>{team.sample ? 'Sample team · ' : ''}Led by {team.leaderName} · <Zone zone={team.timezone} /></p>
           </div>
         </div>
         <div className="crew-gallery-actions">
-          <a className="crew-open-team" href={`#/teams/${encodeURIComponent(team.id)}`}>View team <span aria-hidden="true">↗</span></a>
+          <a className="crew-open-team gallery-link" href={`#/teams/${encodeURIComponent(team.id)}`}>View team <span aria-hidden="true">↗</span></a>
           {count > 1 && <>
-            <button className="crew-nav-button" type="button" aria-label="Previous team" onClick={() => step(-1)}>←</button>
+            <button className="crew-nav-button" type="button" aria-label="Previous team" onClick={() => step(-1)}><span aria-hidden="true">←</span></button>
             <span className="crew-count" aria-hidden="true">{active + 1}/{count}</span>
-            <button className="crew-nav-button" type="button" aria-label="Next team" onClick={() => step(1)}>→</button>
+            <button className="crew-nav-button" type="button" aria-label="Next team" onClick={() => step(1)}><span aria-hidden="true">→</span></button>
           </>}
         </div>
       </div>

@@ -134,7 +134,7 @@
   }
 }
 
-.board-filter-panel { margin: 0 0 16px; }
+.board-filter-panel { margin: 0 0 5px; }
 .board-filter-panel summary { width: fit-content; padding: 8px 12px; min-height: 44px; cursor: pointer; }
 .board-filter-panel[open] { border-bottom: 1px solid var(--line); }
 .board-filter-panel .filters { margin-top: 8px; }
@@ -142,3 +142,18 @@
 .profile-card { max-width: 580px; margin-block-end: 18px; }
 .profile-card > :not(:last-child) { margin-bottom: 16px; }
 .profile-card > h2 { margin-bottom: 7px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(.button, .crew-open-team, .crew-nav-button, .crew-card, .people-frame-control, .people-index-list button, .rail nav a, .board-filter-panel summary) {
+    transition: transform 260ms cubic-bezier(.18,.86,.25,1.24), background-color 150ms ease,
+      border-color 150ms ease, box-shadow 170ms ease;
+  }
+  :is(.button, .crew-open-team, .crew-nav-button, .crew-card, .people-frame-control, .people-index-list button, .rail nav a, .board-filter-panel summary):not([aria-disabled="true"], :disabled):active {
+    transform: translateY(2px) scale(.955); transition-duration: 80ms;
+  }
+  .button-primary:not([aria-disabled="true"]):active { box-shadow: 0 0 0 #8a6a29; }
+  :is(.gallery-link, .crew-nav-button) > span { display: inline-block; transition: transform 220ms cubic-bezier(.18,.86,.25,1.24); }
+  :is(.gallery-link:hover, .gallery-link:focus-visible) > span { transform: translate(3px, -3px); }
+  .crew-nav-button:active > span { transform: translateX(var(--arrow-nudge, 3px)); }
+  .crew-nav-button:first-of-type { --arrow-nudge: -3px; }
+}

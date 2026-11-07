@@ -146,14 +146,14 @@ h2 { letter-spacing: -.02em; }
 .tab-blinds span {
   background: var(--bg);
   transform-origin: center bottom;
-  animation: open-tab-blind 210ms cubic-bezier(.15,.75,.27,1) both;
+  animation: open-tab-blind 320ms cubic-bezier(.25,.7,.19,1) both;
 }
 .tab-blinds span:nth-child(2) { animation-delay: 12ms; }
 .tab-blinds span:nth-child(3) { animation-delay: 24ms; }
 .tab-blinds span:nth-child(4) { animation-delay: 36ms; }
 .tab-blinds span:nth-child(5) { animation-delay: 48ms; }
 @keyframes open-tab-blind {
-  from { transform: scaleY(.85); }
+  from { transform: scaleY(1); }
   to { transform: scaleY(0); }
 }
 

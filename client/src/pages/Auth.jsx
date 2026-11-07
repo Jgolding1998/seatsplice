@@ -238,8 +238,8 @@ export function AuthPage({ notice, onSignedIn, refreshSession }) {
       </section>
       <SignalArt artRef={artRef} onOpenSignIn={expanded ? undefined : openSignIn} />
       {expanded && <section ref={formRef} className="auth-panel"><div className="auth-form">
-        <Page key={mode} title={title} eyebrow={invited ? 'You have a team invite' : undefined}
-          intro={invited ? 'Sign in or create an account, then confirm your invite.' : mode === 'login' ? 'Sign in to your team board.' : 'Tell teams what you can help build.'}>
+        <Page key={mode} title={title} eyebrow={invited ? 'You have a team invite' : mode === 'signup' ? 'Hack4Hack Crew Hiring Challenge / PS1 demo' : undefined}
+          intro={invited ? 'Sign in or create an account, then confirm your invite.' : mode === 'login' ? 'Sign in to your team board.' : 'Create a Seatsplice demo account to try team formation.'}>
           {notice && <p className="alert" role="status">{notice}</p>}
           <Form onSignedIn={onSignedIn} refreshSession={refreshSession} onSwitch={() => setMode(mode === 'login' ? 'signup' : 'login')} />
         </Page>

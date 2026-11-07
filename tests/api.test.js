@@ -7,6 +7,7 @@ import request from 'supertest';
 import { createApp } from '../server/app.js';
 import { hash } from '../server/auth.js';
 import { connect, membershipQuery } from '../server/db.js';
+import { seedFixtures } from '../server/fixtures.js';
 
 const origin = 'http://localhost:3000';
 const credentials = {
@@ -484,6 +485,21 @@ test('suggestions rank complementary nearby skills and omit people on a team', a
   assert.equal(response.body.people[0].id, near.id);
   assert.match(response.body.people[0].reason, /Adds MongoDB/);
   assert.ok(!response.body.people.some(person => person.id === assigned.id || 'email' in person));
+});
+
+test('demo seeding refreshes fictional names without changing real profiles or memberships', async () => {
+  const real = await person('Ada Example');
+  const options = { participants: 24, teamCount: 8 };
+  await seedFixtures(db, options);
+  const sample = await db.teams.findOne({ name: 'Rubber Duck Debuggers' });
+  await db.teams.updateOne({ _id: sample._id }, { $set: { leaderName: 'Ada Knuth' } });
+  await db.users.updateOne({ _id: sample.leaderId }, { $set: { name: 'Ada Knuth' } });
+  await seedFixtures(db, options);
+  const { person: leader } = (await get(`/people/${sample.leaderId}`, real).expect(200)).body;
+  assert.equal(leader.name, 'Alex Rivera');
+  assert.equal((await db.teams.findOne({ _id: sample._id })).leaderName, leader.name);
+  assert.equal((await db.memberships.findOne(membershipQuery(sample.leaderId))).teamId, sample._id);
+  assert.equal((await get('/me', real).expect(200)).body.user.name, 'Ada Example');
 });
 
 test('profile edits are scoped to the caller and expose only public fields to participants', async () => {

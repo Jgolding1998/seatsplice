@@ -112,7 +112,7 @@ export function BoardPage({ initial, path, showWelcome }) {
   };
 
   return (
-    <Page title="Find a team" intro="Find an open seat and ask to join.">
+    <Page title="Find a team" eyebrow="Hack4Hack / Team formation" intro="Find an open seat and ask to join.">
       {showWelcome && <Welcome name={user.name} />}
       <p className="visually-hidden" role="status">{resultNotice}</p>
       <details className="board-filter-panel" open={Boolean(initial.get('q') || initial.get('skill'))}>
@@ -142,10 +142,6 @@ export function BoardPage({ initial, path, showWelcome }) {
             <Button aria-pressed={display === 'gallery'} onClick={() => setDisplay('gallery')}>Gallery</Button>
             <Button aria-pressed={display === 'list'} onClick={() => setDisplay('list')}>List</Button>
           </div>
-          {!teamId && <div className="row">
-            <a className="button board-create" href="#/new">Create a team <span aria-hidden="true">+</span></a>
-            <a className="button board-create" href="#/join">Use invite code</a>
-          </div>}
           {board.stale && board.updatedAt && <p className="muted">Could not refresh. Showing teams from {formatClock(board.updatedAt)}</p>}
         </div>
 
@@ -180,6 +176,10 @@ export function BoardPage({ initial, path, showWelcome }) {
           </ul>
         ))}
 
+        {!teamId && <div className="row board-team-actions">
+          <a className="button board-create" href="#/new">Create a team <span aria-hidden="true">+</span></a>
+          <a className="button board-create" href="#/join">Use invite code</a>
+        </div>}
         {(pageNumber > 1 || nextCursor) && (
           <nav className="row pager" aria-label="Board pages">
             {pageNumber > 1 && <Button onClick={goPrevious}>Previous page</Button>}

@@ -429,12 +429,26 @@ test('pasted credentials sign in and profile edits persist on the team board acc
   const choice = page.getByRole('list', { name: 'Choose a teammate' }).getByRole('button').nth(1);
   await choice.click();
   await expect(choice).toHaveAttribute('aria-pressed', 'true');
+  const stage = page.locator('.people-stage');
+  const { x, y, width, height } = await stage.boundingBox();
+  const main = await page.locator('main').boundingBox();
+  expect(x).toBeCloseTo(main.x, 0);
+  expect(width).toBeCloseTo(main.width, 0);
+  await page.mouse.move(x + width * .46, y + height * .49);
+  await page.mouse.down();
+  await page.mouse.move(x + width * .46 - 92, y + height * .49, { steps: 4 });
+  await expect(stage).toHaveAttribute('data-dragging', '');
+  await page.mouse.up();
+  const nextChoice = page.getByRole('list', { name: 'Choose a teammate' }).getByRole('button').nth(2);
+  await expect(nextChoice).toHaveAttribute('aria-pressed', 'true');
   const peopleScan = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
   expect(peopleScan.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => node.target) }))).toEqual([]);
   const name = await page.locator('.people-record h3').innerText();
   await page.getByRole('link', { name: 'View profile' }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
   await expect(page.getByText('Email', { exact: true })).toHaveCount(0);
+  await page.goBack();
+  await expect(nextChoice).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('link', { name: 'Board', exact: true }).click();
   await makeTeam(page, 'Build Instructions');
   await page.getByRole('link', { name: 'Edit team' }).click();
@@ -478,13 +492,17 @@ test('an invite link waits for confirmation and claims its preapproved seat once
 });
 
 test('gallery shows live seat counts and supports arrows, swipe, and list view', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await signup(page, 'Gallery Reader');
   await page.getByRole('link', { name: 'Board', exact: true }).click();
   const gallery = page.getByRole('region', { name: 'Team gallery' });
   await expect(gallery.getByRole('heading', { name: 'Rubber Duck Debuggers' })).toBeVisible();
   await expect(gallery.locator('[data-slot="0"]')).toContainText('2 open seats');
   const next = gallery.getByRole('button', { name: 'Next team' });
-  await next.click();
+  await next.hover();
+  await page.mouse.down();
+  await expect.poll(() => next.evaluate(button => getComputedStyle(button).transform)).not.toBe('none');
+  await page.mouse.up();
   await expect(gallery.getByRole('heading', { name: 'Stack Underflow' })).toBeVisible();
   await next.press('ArrowLeft');
   await expect(gallery.getByRole('heading', { name: 'Rubber Duck Debuggers' })).toBeVisible();

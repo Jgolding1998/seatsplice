@@ -1,8 +1,8 @@
 /* The deck is the Board's canvas. Search, results and selection share the same page surface. */
-.shell main.board-view {
+.shell main:is(.board-view, .people-view, .gallery-detail) {
   --board-gutter: clamp(16px, 4vw, 64px);
-  --bg: #191922;
-  --surface: #23232e;
+  --bg: #141217;
+  --surface: #201c23;
   --ink: #faf3e8;
   --ink-2: #e0d7e3;
   --ink-3: #c3bace;
@@ -22,10 +22,19 @@
   padding-inline: var(--board-gutter);
   overflow-x: clip;
   color: var(--ink);
-  background: var(--bg);
+  background: radial-gradient(ellipse at 60% 43%, #262231 0%, transparent 69%), var(--bg);
 }
+.shell main.people-view { background: radial-gradient(ellipse at 56% 36%, #2b222c 0%, transparent 66%), var(--bg); }
+.gallery-detail .page-head h1 { font-size: clamp(36px, 5.6vw, 72px); line-height: 1.02; letter-spacing: -.06em; }
+.gallery-detail .profile-card { border: 0; background: transparent; padding: 0; }
+:is(.board-view, .people-view) .page-head h1 {
+  font-size: clamp(48px, 7.3vw, 108px); line-height: .92; letter-spacing: -.077em;
+}
+:is(.board-view, .people-view) .page-head .eyebrow { color: #efd397; margin-bottom: 9px; }
+:is(.board-view, .people-view) .page-intro { margin-top: 9px; }
 .board-view .page-head { margin-bottom: 17px; padding-bottom: 0; border: 0; }
 .board-view .page-intro { margin-top: 7px; }
+.board-view .crew-welcome { background: transparent; border: 0; padding: 0; margin-bottom: 9px; }
 .board-view .filters { margin-bottom: 0; }
 .board-view .filters .field { margin-bottom: 11px; }
 .board-view .filters input { background: #22222e; }
@@ -33,12 +42,11 @@
   align-items: center;
   gap: 7px 10px;
   padding-block: 8px;
-  border-bottom: 1px solid var(--line);
 }
 .board-view .section-head h2 { font-size: 15px; }
 .board-view .board-display { gap: 0; margin-left: auto; }
 .board-display .button {
-  min-height: 36px;
+  min-height: 44px;
   padding-inline: 12px;
   border-radius: 0;
   font-size: 13px;
@@ -47,12 +55,12 @@
 .board-display .button:last-child { margin-left: -1px; border-radius: 0 4px 4px 0; }
 .board-display .button[aria-pressed="true"] { background: #f4d46b; color: #27242a; border-color: #f4d46b; }
 .board-display .button:focus-visible { position: relative; z-index: 1; }
-.board-view .board-create { min-height: 36px; gap: 8px; padding: 5px 10px; font-size: 13px; }
+.board-view .board-team-actions { margin-top: 13px; }
+.board-view .board-create { min-height: 44px; gap: 8px; padding: 5px 10px; font-size: 13px; }
 .board-create span { font: 650 19px/1 var(--mono); transition: transform 170ms var(--ease); }
 .board-create:hover span { transform: rotate(90deg); }
 
 .crew-gallery {
-  --gallery-ground: #191922;
   --gallery-line: #535363;
   --gallery-text: #faf6ed;
   --gallery-muted: #cbc8d3;
@@ -73,11 +81,8 @@
   perspective: 850px;
   touch-action: pan-y pinch-zoom;
   user-select: none;
-  background:
-    radial-gradient(ellipse at center, #34304145, transparent 74%),
-    var(--gallery-ground);
 }
-.crew-stage::before, .auth-story::before {
+.auth-story::before {
   content: "";
   position: absolute;
   z-index: -2;
@@ -110,6 +115,7 @@
   position: absolute;
   inset: 12% 0 auto;
   color: var(--stage-ink);
+  opacity: .63;
   z-index: -1;
   font: 850 clamp(83px, 14vw, 184px)/.76 var(--sans);
   letter-spacing: -.11em;
@@ -126,9 +132,11 @@
   top: 50%;
   width: var(--cover-width);
   height: var(--cover-height);
-  transform: translate(-50%, -50%) translateX(var(--slide)) translateZ(var(--depth)) rotateY(var(--yaw));
+  transform: translate(-50%, -50%) translateX(calc(var(--slide) + var(--gallery-drag, 0px))) translateZ(var(--depth)) rotateY(var(--yaw));
   transition: transform 365ms cubic-bezier(.18,.78,.26,1), opacity 190ms ease-out;
 }
+.crew-stage[data-dragging] .crew-cover { transition: opacity 190ms ease-out; }
+.crew-stage[data-dragging] .crew-card { cursor: grabbing; }
 .crew-cover[data-slot="0"] { z-index: 4; }
 .crew-cover[data-slot="-1"], .crew-cover[data-slot="1"] { z-index: 3; --depth: -80px; }
 .crew-cover[data-slot="-2"], .crew-cover[data-slot="2"] { z-index: 2; --depth: -153px; }
@@ -278,5 +286,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .crew-cover { --yaw: 0deg !important; }
-  .crew-placeholder, .crew-stage::before, .auth-story::before { animation: none; }
+  .crew-placeholder, .auth-story::before { animation: none; }
 }

@@ -51,6 +51,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   const signOut = useAction();
   const main = useRef(null);
   const boardMemory = useRef({ display: 'gallery', filters: '', cursors: [null], selected: null });
+  const peopleMemory = useRef({ query: '', selected: null });
   useFocusRescue(main);
 
   useEffect(() => {
@@ -110,7 +111,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   )), [setSession]);
 
   const context = useMemo(() => ({
-    user, teamId, tick, announce, refreshSession: safeRefresh, ownTeam, boardMemory, updateProfile
+    user, teamId, tick, announce, refreshSession: safeRefresh, ownTeam, boardMemory, peopleMemory, updateProfile
   }), [user, teamId, tick, announce, safeRefresh, ownTeam, updateProfile]);
 
   const handleLogout = () => signOut.run(async () => {
@@ -123,6 +124,8 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
   const teamMatch = TEAM_ROUTE.exec(route.path);
   const personMatch = PERSON_ROUTE.exec(route.path);
   const onBoard = route.path === '/' || route.path === '/board';
+  const mainStyle = onBoard ? 'board-view' : route.path === '/people' ? 'people-view'
+    : personMatch || (teamMatch && !teamMatch[2]) ? 'gallery-detail' : undefined;
   const links = [
     ['/board', 'Board'],
     ['/people', 'People'],
@@ -179,7 +182,7 @@ function Signedin({ user, teamId, setSession, refreshSession, endSession, showWe
             <p className="rail-stamp">May contain traces of recursion.</p>
           </div>
         </header>
-        <main ref={main} id="main" className={onBoard ? 'board-view' : undefined}>
+        <main ref={main} id="main" className={mainStyle}>
           <React.Fragment key={route.path}>
             {page}
             {tabReveal === route.path && (

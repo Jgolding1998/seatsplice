@@ -2,8 +2,8 @@ import { eventId } from './db.js';
 
 const skills = ['React', 'Node.js', 'Design', 'MongoDB', 'Testing', 'DevOps', 'TypeScript', 'Python', 'Mobile', 'Rust'];
 const zones = ['America/Chicago', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Asia/Kolkata', 'Asia/Tokyo'];
-const first = ['Ada', 'Grace', 'Linus', 'Margaret', 'Katherine', 'Guido', 'Ava', 'Jules', 'Maya', 'Sam', 'Lin', 'Kai'];
-const last = ['Knuth', 'Shannon', 'Lamport', 'Hopper', 'Lovelace', 'Turing', 'Kernighan', 'Hamilton', 'Babbage', 'Ng'];
+const first = ['Alex', 'Jordan', 'Taylor', 'Chris', 'Sarah', 'Marcus', 'Ava', 'Jamie', 'Maya', 'Sam', 'Riley', 'Morgan'];
+const last = ['Rivera', 'Chen', 'Brooks', 'Patel', 'Reed', 'Nguyen', 'Kim', 'Bennett', 'Ortiz', 'Walker'];
 const lookingFor = [
   'A weekend project that makes everyday life a little less annoying.',
   'A small team that wants to ship a working prototype.',
@@ -33,12 +33,19 @@ async function insertMissing(collection, documents, identity = doc => ({ _id: do
   }
 }
 
+async function refreshDemoNames(collection, documents, field) {
+  await collection.bulkWrite(documents.map(document => ({
+    updateOne: { filter: { _id: document._id, fixture: true, [field]: { $ne: document[field] } },
+      update: { $set: { [field]: document[field] } } }
+  })), { ordered: false });
+}
+
 export async function seedFixtures(db, { participants = 10000, teamCount = 2000 } = {}) {
   if (participants < teamCount * 3) throw new Error('Fixture pool is too small for the requested teams.');
   const users = Array.from({ length: participants }, (_, index) => ({
     _id: fixtureId('d', index),
     email: `participant-${index}@crewboard.invalid`,
-    name: `${first[index % first.length]} ${last[Math.floor(index / first.length) % last.length]}`,
+    name: `${first[(index + 5 * Math.floor(index / first.length)) % first.length]} ${last[Math.floor(index / first.length) % last.length]}`,
     skills: [skills[index % skills.length], skills[(index + 3) % skills.length]],
     timezone: zones[index % zones.length],
     ...(participants <= 100 && { lookingFor: lookingFor[index % lookingFor.length] }),
@@ -64,5 +71,9 @@ export async function seedFixtures(db, { participants = 10000, teamCount = 2000 
   await insertMissing(db.users, users);
   await insertMissing(db.teams, teams);
   await insertMissing(db.memberships, memberships, doc => ({ hackathonId: doc.hackathonId, userId: doc.userId }));
+  if (participants <= 100) {
+    if (users.length) await refreshDemoNames(db.users, users, 'name');
+    if (teams.length) await refreshDemoNames(db.teams, teams, 'leaderName');
+  }
   return { participants, teamCount };
 }
